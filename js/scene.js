@@ -119,8 +119,8 @@
   var floatItems = [];        // 所有"会漂浮 + 会炸开"的东西（小球 + 照片）
   var photoItems = [];        // 只装照片（floatItems 的子集，炸开时单独算目标位）
   var photoSlots = [];        // 每张照片的"家"坐标：建球时照着它让位，建照片时照着它落座
-  var orbitDist = 14;         // 相机到蛋糕中心的水平距离（fitCameraToContent 会按包围盒重算）
-  var camHeight = 4.4;        // 相机高度（同上，会被重算成"注视点 + 距离的10%"）
+  var orbitDist = 14;         // 相机到蛋糕中心轴的水平环绕半径（fitCameraToContent 会按"包围球"重算）
+  var camHeight = 4.4;        // 相机高度（同上，会被重算成"注视点 + 距离×sin(俯角)"）
   var contentCenterY = CENTER_Y; // 相机注视点 = 内容包围盒的正中心（初始化时精算）
 
   /* 蜡烛火焰相关的零件（每帧摇曳动画要用） */
@@ -148,9 +148,9 @@
   }
 
   /* 内容包围盒：从"金色标题顶端"到"蛋糕最底层底边"的完整范围。
-     相机构图就靠它 —— 注视点对准它的正中心、距离按它的高和宽算，
-     不管桌面横屏还是手机竖屏，蛋糕+招牌整簇都能刚好装进画面，
-     上下留白天然相等（不会再"上半屏空着、蛋糕底部被切掉"） */
+     相机构图就靠它 —— 注视点对准它的正中心，距离按它算出的"包围球"精算
+     （见 fitCameraToContent），不管桌面横屏还是手机竖屏，
+     蛋糕+招牌整簇都能刚好装进画面，底层圆盘绝不会被屏幕下缘裁掉 */
   function computeContentBounds() {
     var topY = LAYERS[LAYERS.length - 1].y + LAYER_THICK + 0.35 // 顶层封口球顶端
       + TITLE_DY + TITLE_H / 2;                                 // 再叠上标题的上边缘
@@ -158,26 +158,63 @@
     return {
       H: topY - bottomY,                 // 内容总高度
       centerY: (topY + bottomY) / 2,     // 内容正中心 = 相机注视点
-      halfW: LAYERS[0].radius + BALL_R_MAX + 0.6 // 内容半宽 = 最底层半径 + 球径 + 一点边距
+      bottomY: bottomY,                  // 蛋糕最底部的世界高度（校验"底层不被裁"要用）
+      cakeR: LAYERS[0].radius + SKIRT_R  // 蛋糕本体最大半径 = 底层半径5.2 + 轮廓球半径0.24
+                                         //（只罩蛋糕本体和顶部元素；氛围散球是背景点缀，不算进来）
     };
   }
 
-  /* 构图公式（横屏竖屏同一套，resize 时也走这里）：
-     ① 注视点 = 内容中心 contentCenterY —— 上下留白自然相等；
-     ② 距离取"高度刚好放下"和"宽度刚好放下"两者中较远的那个：
-        distV = (H/2) / (tan(fov/2) × 0.72)        → 内容高度占屏 72%，上下各留约 14%
-        distW = halfW / (tan(fov/2) × aspect × 0.85) → 内容宽度占屏 85%，左右各留约 7%
-        （竖屏手机 aspect 小，distW 会变大 → 自动站远，蛋糕底层绝不顶出屏幕）
-     ③ 相机高度 = 注视点 + 距离的 10%，形成轻微俯视，蛋糕层叠的台阶更有立体感。
+  /* 包围球构图法（横屏竖屏同一套，初始化与 resize 都走这里）：
+     为什么用"包围球"而不是"内容高度"？—— 蛋糕底层是半径 5.2 的大圆盘，
+     它靠近镜头那一侧的边缘，离相机比蛋糕中心近得多，透视下会被额外放大
+     （就像给人拍照只量身高、没量他伸向前面的手，手就会顶出照片外）。
+     所以我们给蛋糕套一个"透明气球"（包围球）：镜头只要装得下气球，
+     就装得下蛋糕的任何一个角落 —— 包括那只"伸向前面的手"。
+     ① 气球半径 R = sqrt((H/2)² + cakeR²)：勾股定理 —— H/2 是"球心到
+        蛋糕底/标题顶"的竖直距离，cakeR 是底层圆盘半径，斜边正好罩住
+        "底层圆盘最外缘"这个最容易被裁的刁钻点（顶部元素都在中心轴上，
+        离球心只有 H/2 < R，天然罩得住）；
+     ② 距离取"气球竖向放得下"和"横向放得下"两者中较远的：
+        distV = R / (tan(fov/2) × 0.72)          → 气球占屏高约 72%
+        distW = R / (tan(fov/2) × aspect × 0.85) → 窄屏手机宽向主导，自动站远
+     ③ 相机带一点俯角 pitch（10°，8°~14° 都自然）：水平环绕半径 = dist×cos(pitch)，
+        高度 = 注视点 + dist×sin(pitch)，蛋糕层叠的台阶更有立体感；
+     ④ 保险校验：俯视会把底层投影往下挤，所以单独验算最危险的
+        "底层近镜侧边缘点"—— 它相对视线的下偏角若超过下半视角，
+        就把 dist 拉远 5% 再验，最多 8 次（dist 越大这个偏角越趋近 0，
+        循环一定收敛；气球法本身余量充足，正常一次都进不了循环，
+        它是防止"手抖改参数"的最后一道门）。
      想让画面更紧凑：把 0.72 / 0.85 调大；想更松弛、星星更多：调小 */
   function fitCameraToContent() {
     var b = computeContentBounds();
-    contentCenterY = b.centerY;
-    var halfFovTan = Math.tan((camera.fov / 2) * Math.PI / 180);
-    var distV = (b.H / 2) / (halfFovTan * 0.72);
-    var distW = b.halfW / (halfFovTan * camera.aspect * 0.85);
-    orbitDist = clamp(Math.max(distV, distW) * 1.05, 10, 40); // ×1.05 留 5% 安全边，防球漂移出画
-    camHeight = contentCenterY + orbitDist * 0.10;
+    contentCenterY = b.centerY;                       // 注视点 = 内容正中心（气球球心）
+    var halfFov = (camera.fov / 2) * Math.PI / 180;   // 半视角（弧度）
+    var halfFovTan = Math.tan(halfFov);
+    var R = Math.sqrt((b.H / 2) * (b.H / 2) + b.cakeR * b.cakeR); // ① 气球半径
+    var distV = R / (halfFovTan * 0.72);                  // ② 竖向：气球占屏约 72%
+    var distW = R / (halfFovTan * camera.aspect * 0.85);  // ② 横向：窄屏宽向主导
+    var dist = clamp(Math.max(distV, distW), 10, 40);     // 10~40：太远显空、太近会裁
+    var pitch = 10 * Math.PI / 180;                       // ③ 轻微俯角 10°
+
+    /* ④ 校验"底层近镜侧边缘点"（站在底层圆盘朝向相机的那一边、高度 bottomY）。
+       把三维问题压扁到"过相机与中心轴的竖直剖面"里看直角三角形：
+       near = 相机到该点的水平距离（它在靠近相机这一侧，所以要减去蛋糕半径），
+       drop = 相机到该点的竖直落差；该点的下俯角 α = atan2(drop, near)。
+       视线本身下俯 pitch，所以它相对视线往下偏 (α − pitch)，
+       不能超过下半视角（留 2% 余量，防小球轻微漂移出画） */
+    for (var k = 0; k < 8; k++) {
+      var near = dist * Math.cos(pitch) - b.cakeR;
+      if (near <= 0.5) { dist *= 1.05; continue; } // 相机快压到圆盘正上方了，先拉远
+      var drop = contentCenterY + dist * Math.sin(pitch) - b.bottomY;
+      var alpha = Math.atan2(drop, near);
+      if (alpha - pitch <= halfFov * 0.98) break;  // 安全：底层完整在画面内
+      dist *= 1.05;                                 // 危险：拉远 5% 后重验
+    }
+
+    /* 最终环绕参数 = 水平半径 + 高度（animate 的绕圈、炸开照片的 viewDist
+       都从这两个值派生，语义和上一代完全一致） */
+    orbitDist = dist * Math.cos(pitch);
+    camHeight = contentCenterY + dist * Math.sin(pitch);
   }
 
   /* ============================================================
@@ -216,10 +253,10 @@
     var fov = isMobile ? 62 : 55;
     camera = new THREE.PerspectiveCamera(fov, window.innerWidth / window.innerHeight, 0.1, 300);
 
-    /* 构图居中（修复"上半屏大片空白、蛋糕底部溢出被切"）：
+    /* 构图居中（修复"蛋糕底部溢出被切、构图偏下"）：
      不再拍脑袋盯固定高度，而是先算"内容包围盒"（标题顶 → 蛋糕底），
-     注视点对准包围盒正中心，距离按 fov 和屏幕比例精算 ——
-     上下留白大致相等，整个内容永远完整在画面里（公式见 fitCameraToContent） */
+     再给它套一个"透明气球"（包围球）算距离 —— 注视点对准球心，
+     镜头装得下气球就装得下蛋糕的每个角落（公式见 fitCameraToContent） */
     fitCameraToContent();
 
     renderer = new THREE.WebGLRenderer({ antialias: !isMobile }); // 手机关抗锯齿省电
