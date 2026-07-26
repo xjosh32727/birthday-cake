@@ -191,7 +191,7 @@
     var halfFov = (camera.fov / 2) * Math.PI / 180;   // 半视角（弧度）
     var halfFovTan = Math.tan(halfFov);
     var R = Math.sqrt((b.H / 2) * (b.H / 2) + b.cakeR * b.cakeR); // ① 气球半径
-    var distV = R / (halfFovTan * 0.86);                  // ② 竖向：气球占屏约 86%
+    var distV = R / (halfFovTan * 0.83);                  // ② 竖向：气球占屏约 83%
     var distW = R / (halfFovTan * camera.aspect * 0.85);  // ② 横向：窄屏宽向主导
     var dist = clamp(Math.max(distV, distW), 10, 40);     // 10~40：太远显空、太近会裁
     var pitch = 10 * Math.PI / 180;                       // ③ 轻微俯角 10°
