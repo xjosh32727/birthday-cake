@@ -3,14 +3,17 @@
  * ------------------------------------------------------------
  * 这个文件负责五件事：
  *   1. 搭舞台：纯黑背景 + 满天星星（像把房间灯关掉，只留蛋糕上的烛光）
- *   2. 堆蛋糕：数百颗"亮晶晶"的小球（瓷珠 + 通透玻璃珠，带环境反射高光）
- *      堆成 5 层圆丘蛋糕，大大小小错落分布，还会像泡泡一样缓缓漂移
- *   3. 立招牌：蛋糕上方从下到上依次是 —— 发光岁数数字、蜡烛+泪滴形火焰
- *      （根部钉在烛芯上、中上部随风轻摆）、寿星名字、金色衬线字
- *      "Happy Birthday"（全都永远面向你）
- *   4. 放照片：照片做成"拍立得"（白边+照片），点缀在球丘四周
+ *   2. 堆蛋糕：四百多颗"亮晶晶"的小球（瓷珠 + 通透玻璃珠，带环境反射高光）
+ *      堆成 5 层挺拔的锥台蛋糕，每层外缘还有一圈整齐的"裙边裱花球"，
+ *      远远一眼就能看出"这是蛋糕"而不是一堆球
+ *   3. 立招牌：蛋糕上方从下到上依次是 —— 发光岁数数字、缩小版蜡烛+泪滴形火焰
+ *      （根部钉在烛芯上、中上部随风轻摆；蜡烛甘当配角，蛋糕才是主角）、
+ *      寿星名字、金色衬线字 "Happy Birthday"（全都永远面向你）
+ *   4. 放照片：照片做成"拍立得"（白边+照片）镶在球丘上，
+ *      球球们会主动给照片让出一块"空洞"，绝不挡住寿星的脸
  *   5. 炸开魔法：window.toggleCakeExplode() —— 小球像漫天泡泡海洋一样
- *      炸满整个画面并缓缓游动，照片飞到你面前放大展示；再触发一次就飞回去
+ *      炸满整个画面并缓缓游动，照片直接飞到你眼前放大 3 倍多展示，
+ *      球海还会自觉让开"照片与相机之间的走廊"；再触发一次就飞回去
  *
  * 对外只暴露两个函数（form.js 和 gesture.js 会调用，契约不可改）：
  *   - window.startCakeScene({name, age, photos, cameraStream})
@@ -24,52 +27,66 @@
     一、可调参数区（想改效果，先改这里，每处都写了"改了会怎样"）
     ============================================================ */
 
-  /* 珍珠色盘：小球随机从中取色，整体是"温暖糖果店"的感觉。
+  /* 糖果屋暖色盘：小球大部分从这里取色，整体是"温暖糖果店"的感觉。
      想换风格就改色号，比如改成全粉系：0xff9ff3, 0xfecfef ... 随你发挥 */
   var PEARL_COLORS = [
-    0xff5e5b, // 珊瑚红
-    0xffc53d, // 金
-    0x7bd88f, // 蜜瓜绿
-    0x5cc8ff, // 天蓝
-    0xb892ff, // 紫
-    0xff8fab, // 粉
-    0xff9f43, // 琥珀
+    0xffb3c1, // 蜜桃粉
+    0xff9f68, // 蜜糖橙
+    0xffe29a, // 奶油黄
+    0xff6b81, // 草莓红
+    0xffc8a2, // 暖杏
+    0xffd76e, // 淡金
     0xfff3e0  // 奶白
   ];
 
-  /* 蛋糕结构：5 层圆丘，从下到上逐层收窄（手机端球数自动×0.45保帧率）。
-     count = 这一层摆多少个球；radius = 这一层的圆盘半径；y = 这一层的高度。
+  /* 冷色只做"点缀"：两颗明亮的马卡龙色，像蛋糕上偶尔撒的糖针。
+     它们出现的总概率由 COOL_RATIO 控制（≤20%），多了就会抢走暖色调 */
+  var COOL_COLORS = [
+    0xa8e6ff, // 浅蓝马卡龙
+    0xb5f0d8  // 薄荷马卡龙
+  ];
+  var COOL_RATIO = 0.18; // 冷色球出现的概率：0.18 = 大约每 6 颗里 1 颗，你可以改成 0.1 更暖
+
+  /* 蛋糕结构：5 层锥台，从下到上按 0.8/0.75/0.7/0.7 的节奏明确收窄，
+     层间距也收紧了（0.60→0.50），整体轮廓是挺拔的"蛋糕剪影"。
+     count = 这一层"山体"摆多少个球（裙边另算）；radius = 圆盘半径；y = 高度。
      想让蛋糕更胖：把 radius 整体调大；想更高：把 y 间距拉大 */
   var LAYERS = [
-    { radius: 4.4, y: 0.50, count: 108 },
-    { radius: 3.6, y: 1.25, count: 84 },
-    { radius: 2.8, y: 1.95, count: 61 },
-    { radius: 2.0, y: 2.60, count: 41 },
-    { radius: 1.25, y: 3.20, count: 26 }
-  ];                                        // 桌面端总计约 320 个球（手机端约 145 个）
+    { radius: 4.20, y: 0.45, count: 108 },
+    { radius: 3.40, y: 1.05, count: 78 },
+    { radius: 2.65, y: 1.62, count: 50 },
+    { radius: 1.95, y: 2.16, count: 30 },
+    { radius: 1.25, y: 2.66, count: 15 }
+  ]; // 山体约 281 球 + 裙边约 167 球 ≈ 桌面端 448 球（手机端自动×0.45 ≈ 200 球保帧率）
 
-  /* 球的实际半径由 pickBallRadius() 分段随机（0.08~0.42，大大小小像泡泡）。
+  /* 裙边球：每层外缘一圈大小一致、间距均匀的"花边"，像裱花袋沿蛋糕边
+     挤出来的一圈奶油 —— 有了它，分层轮廓一眼可辨。想花边更饱满就把 0.23 调大 */
+  var SKIRT_R = 0.23;
+
+  /* 球的实际半径由 pickBallRadius() 分段随机（0.10~0.44，大大小小像泡泡）。
      这里的 BALL_R_MAX 只用来估算"蛋糕占地多宽 / 顶部多高"（给相机和蜡烛定位），
-     务必 ≥ 实际最大半径 0.42，否则相机会算得太近、蜡烛会插进球里 */
-  var BALL_R_MAX = 0.42;
+     务必 ≥ 实际最大半径 0.44，否则相机会算得太近、蜡烛会插进球里 */
+  var BALL_R_MAX = 0.44;
   var GLASS_RATIO = 0.25;   // "玻璃珠"占比：0.25 = 大约每 4 个球里有 1 个半透明
-  var PEARL_EMISSIVE = 0.16; // 瓷珠自发光：故意压低，靠高光反射取胜，才没有"廉价荧光塑料感"
-  var GLASS_EMISSIVE = 0.15; // 玻璃珠自发光：以通透为主，微微发光即可（0=全黑 1=亮瞎眼）
+  var PEARL_EMISSIVE = 0.20; // 瓷珠自发光：暖色系偏浅色，0.20 刚好"亮晶晶且颜色甜"，再高就像荧光塑料了
+  var GLASS_EMISSIVE = 0.18; // 玻璃珠自发光：以通透为主，微微发光即可（0=全黑 1=亮瞎眼）
 
   var STAR_COUNT = 700;   // 星星数量（手机端减半）。想更梦幻改成 1200 试试
-  var CENTER_Y = 3.6;     // 蛋糕的"心脏"高度：相机盯着它看，小球从它往外炸
+  var CENTER_Y = 3.4;     // 蛋糕的"心脏"高度：相机盯着它看，小球从它往外炸
 
   var ORBIT_SECONDS = 25; // 相机绕蛋糕转一圈的秒数（改小→转得更快，会晕哦）
   var EXPLODE_MS = 1000;  // 炸开/恢复动画时长（0.8~1.2 秒之间最舒服）
 
   var PHOTO_MAX = 10;           // 最多上墙的照片数（太多了会挡蛋糕）
-  var PHOTO_EXPLODE_SCALE = 2.3; // 炸开后照片放大的基准倍数（2~2.5 之间最好看）
+  var PHOTO_CLEAR = 1.3;        // 照片专属的"私人空间"半径：这个范围内的球会让位
+  var PHOTO_EXPLODE_SCALE = 3.4; // 炸开后照片放大的基准倍数（3~4 之间最抢眼，寿星必须是大明星）
 
   /* 炸开后小球的散布范围：以蛋糕中心为球心的大球壳。
-     另外还有约 45% 的球会落在更近的"近景带"(8~16)，专门萦绕在
-     飞到相机前的照片簇四周 —— 照片被泡泡簇拥着，不会空荡 */
+     另外还有约 45% 的球会落在更近的"近景带"(8~16)，萦绕在照片簇四周 ——
+     但炸开瞬间会把挡在"照片↔相机走廊"里的球统统请出去（见 CORRIDOR_R） */
   var EXPLODE_R_MIN = 13; // 远景带：飞得最近的球离中心多远
   var EXPLODE_R_MAX = 24; // 远景带：飞得最远的球（别超过相机远裁剪面 300，放心）
+  var CORRIDOR_R = 3.4;   // "照片走廊"半径：走廊内的球会被推到走廊外，想照片更独占 C 位就调大
 
   /* ============================================================
     二、内部状态（只初始化一次的"单例"零件）
@@ -79,6 +96,7 @@
   var billboards = [];        // 所有"每帧要面向相机"的平面（标题/名字/岁数）
   var floatItems = [];        // 所有"会漂浮 + 会炸开"的东西（小球 + 照片）
   var photoItems = [];        // 只装照片（floatItems 的子集，炸开时单独算目标位）
+  var photoSlots = [];        // 每张照片的"家"坐标：建球时照着它让位，建照片时照着它落座
   var orbitDist = 14;         // 相机到蛋糕中心的距离（初始化时按屏幕比例算）
   var camHeight = 4.3;        // 相机高度
 
@@ -169,12 +187,18 @@
     /* ---------- 3. 星空 ---------- */
     buildStarfield(starCount);
 
-    /* ---------- 4. 珍珠球蛋糕 ---------- */
+    /* ---------- 4. 珍珠球蛋糕 ----------
+       关键顺序：先算好每张照片的"家"（photoSlots），再堆球 ——
+       球球们落座前都会看看"这里是不是照片的地盘"，是就换个位置，
+       这样照片镶进球丘时自带一圈"空洞"，永远不会被球挡住脸。
+       没照片时 photoSlots 是空的，所有位置照常摆球，蛋糕饱满 */
+    var photoList = photos.slice(0, PHOTO_MAX);
+    computePhotoSlots(photoList.length);
     buildBallCake(ballScaleFactor);
 
     /* ---------- 5. 照片拍立得（没照片就跳过） ---------- */
-    if (photos.length > 0) {
-      buildPhotos(photos.slice(0, PHOTO_MAX));
+    if (photoList.length > 0) {
+      buildPhotos(photoList);
     }
 
     /* ---------- 6. 招牌区：岁数数字 → 蜡烛火焰 → 名字 → 标题 ----------
@@ -183,12 +207,12 @@
 
     if (age !== '') {
       var agePlate = buildAgePlate(age);
-      agePlate.position.set(0, cakeTopY + 0.62, 0); // 紧贴顶部球层
+      agePlate.position.set(0, cakeTopY + 0.55, 0); // 紧贴顶层裙边，不悬空
       scene.add(agePlate);
       billboards.push(agePlate);
     }
 
-    buildCandle(cakeTopY + 1.15); // 蜡烛站在岁数数字正上方
+    buildCandle(cakeTopY + 1.08); // 蜡烛站在岁数数字正上方（已瘦身，蛋糕才是主角）
 
     var namePlate = buildTextPlate({
       text: name,
@@ -200,7 +224,7 @@
       planeW: 5.4,
       planeH: 1.25
     });
-    namePlate.position.set(0, cakeTopY + 3.35, 0);
+    namePlate.position.set(0, cakeTopY + 3.15, 0);
     scene.add(namePlate);
     billboards.push(namePlate);
 
@@ -214,13 +238,13 @@
       planeW: 8.2,
       planeH: 1.9
     });
-    titlePlate.position.set(0, cakeTopY + 4.55, 0);
+    titlePlate.position.set(0, cakeTopY + 4.35, 0);
     scene.add(titlePlate);
     billboards.push(titlePlate);
 
     /* ---------- 7. 预计算所有小球的"炸开落点" ----------
-     为什么提前算好？因为炸开那一刻再算 300 多个随机数会卡一下，
-     提前存好，触发时直接"照单执行"，动画丝般顺滑 */
+     先算一份存着，炸开那一刻还会按当时的相机位置重算并"清走廊"，
+     几百个随机数对电脑来说眨眼就算完，放心 */
     precomputeBallExplodeTargets();
 
     /* ---------- 8. 窗口缩放自适应（手机转横屏也要正常显示） ---------- */
@@ -315,9 +339,30 @@
     return tex;
   }
 
-  /* 珍珠球蛋糕：几百个小圆球堆成 5 层圆丘 */
+  /* 照片"私人空间"：先按最终摆放公式算出每张照片的圆心坐标存进 photoSlots。
+     建球和建照片都用这同一份坐标，保证"让位的空洞"和照片严丝合缝 */
+  function computePhotoSlots(n) {
+    photoSlots = [];
+    for (var i = 0; i < n; i++) {
+      var angle = (i / n) * Math.PI * 2 + Math.PI / n; // 均匀环绕
+      var y = 0.9 + (i % 3) * 1.1;                     // 高度错开三层
+      photoSlots.push({ x: Math.cos(angle) * 3.9, y: y, z: Math.sin(angle) * 3.9 });
+    }
+  }
+
+  /* 这个坐标离某张照片太近吗？近 = 在照片的"私人空间"里，球不能坐这里 */
+  function nearPhotoSlot(x, y, z) {
+    for (var i = 0; i < photoSlots.length; i++) {
+      var s = photoSlots[i];
+      var dx = x - s.x, dy = y - s.y, dz = z - s.z;
+      if (dx * dx + dy * dy + dz * dz < PHOTO_CLEAR * PHOTO_CLEAR) return true;
+    }
+    return false;
+  }
+
+  /* 珍珠球蛋糕：几百个小圆球堆成 5 层锥台 + 每层一圈裙边 */
   function buildBallCake(scaleFactor) {
-    /* 几何体和材质尽量"共用"：300 多个球共用 1 个球体模型 + 十几种材质，
+    /* 几何体和材质尽量"共用"：400 多个球共用 1 个球体模型 + 十几种材质，
      就像用同一个模具烤一炉饼干，省内存、渲染快。
      注意：模型半径做成 1，每个球用自己的缩放当半径，灵活又省钱 */
     var ballGeo = new THREE.SphereGeometry(1, 18, 14);
@@ -328,12 +373,13 @@
     var envMap = makeEnvTexture();
     scene.environment = envMap;
 
-    /* 两套材质（共用同一张环境贴图）：
+    /* 两套材质（共用同一张环境贴图）×（7 暖色 + 2 马卡龙冷色）：
        ① 瓷珠/珍珠款(约75%)：不透明 + 锐利白色高光(shininess 高 = 光斑小而亮)，
-          自发光压低到 0.16 —— 靠反射高光取胜而不是自发光，避免"廉价荧光感"
+          自发光 0.20 —— 暖色+反射高光双管齐下，亮晶晶又不会发黑发灰
        ② 玻璃珠款(约25%)：半透明(0.60~0.75) + depthWrite 关闭（防止透明球
           互相排序错乱、出现奇怪的硬边）+ envMapIntensity 拉高，通透得像水果硬糖 */
-    var pearlMats = PEARL_COLORS.map(function (c) {
+    var ALL_COLORS = PEARL_COLORS.concat(COOL_COLORS);
+    var pearlMats = ALL_COLORS.map(function (c) {
       return new THREE.MeshPhongMaterial({
         color: c,
         emissive: c,
@@ -341,10 +387,10 @@
         shininess: 100,               // 想高光更锐利保持 100，更哑光降到 60
         specular: 0xffffff,           // 纯白色高光，才有"玻璃反光"感
         envMap: envMap,
-        envMapIntensity: 1.0          // 想反射更强调到 1.2，更弱降到 0.8
+        envMapIntensity: 1.15         // 想反射更强调到 1.3，更弱降到 0.9
       });
     });
-    var glassMats = PEARL_COLORS.map(function (c) {
+    var glassMats = ALL_COLORS.map(function (c) {
       return new THREE.MeshPhongMaterial({
         color: c,
         emissive: c,
@@ -355,60 +401,93 @@
         opacity: 0.6 + Math.random() * 0.15, // 0.60~0.75，每颗略不同更自然
         depthWrite: false,
         envMap: envMap,
-        envMapIntensity: 1.35         // 玻璃反射更亮，才有"亮晶晶"的剔透感
+        envMapIntensity: 1.45         // 玻璃反射更亮，才有"亮晶晶"的剔透感
       });
     });
+
+    /* 抽材质两步走：先按 COOL_RATIO 决定"暖色还是冷色点缀"，
+       再从对应色盘里抽一颗、按 GLASS_RATIO 决定瓷珠还是玻璃珠 */
+    function pickMat() {
+      var idx;
+      if (Math.random() < COOL_RATIO) {
+        idx = PEARL_COLORS.length + Math.floor(Math.random() * COOL_COLORS.length);
+      } else {
+        idx = Math.floor(Math.random() * PEARL_COLORS.length);
+      }
+      return Math.random() < GLASS_RATIO ? glassMats[idx] : pearlMats[idx];
+    }
+
+    /* 生一颗球并给它建"漂浮档案"（山体球和裙边球共用这套流程） */
+    function spawnBall(x, y, z, ballR) {
+      var ball = new THREE.Mesh(ballGeo, pickMat());
+      ball.scale.setScalar(ballR);
+      ball.position.set(x, y, z);
+      scene.add(ball);
+
+      var item = makeFloatItem(ball, false);
+      item.baseScale = ballR; // 小球的"原始缩放"就是它的半径，动画缩放要乘在它上面
+      item.bobAmp = 0.025 + Math.random() * 0.03; // 球的呼吸极轻微，像水母轻轻一张一合
+
+      /* 梦幻漂移参数：随机方向的单位向量 + 独立振幅/频率/相位。
+         每帧位置 = 补间位置 + driftDir × sin(时间×频率 + 相位) × 振幅，
+         蛋糕形态和炸开形态都生效 —— 球海就像泡泡一样缓缓游动 */
+      item.driftDir.set(Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1);
+      if (item.driftDir.lengthSq() < 0.0001) item.driftDir.set(0, 1, 0); // 防倒霉的零向量
+      item.driftDir.normalize();
+      item.driftAmp = 0.1 + Math.random() * 0.25;   // 振幅 0.10~0.35，想飘更浪就调大
+      item.driftFreq = 0.2 + Math.random() * 0.4;   // 频率 0.2~0.6 rad/s，慢慢游才梦幻
+      item.driftPhase = Math.random() * Math.PI * 2;
+
+      floatItems.push(item);
+    }
 
     for (var layer = 0; layer < LAYERS.length; layer++) {
       var def = LAYERS[layer];
       var count = Math.max(8, Math.round(def.count * scaleFactor));
 
+      /* ---- 山体球：圆盘里随机撒，靠近照片的让位 ---- */
       for (var j = 0; j < count; j++) {
-        /* 在圆盘里均匀随机取点：sqrt 是数学小技巧，
-           不加它球会全挤在圆心，像没搅开的芝麻糊 */
-        var rr = Math.sqrt(Math.random()) * def.radius;
-        var ang = Math.random() * Math.PI * 2;
-        /* 圆心处稍微垫高一点，层与层之间形成微微鼓起的"圆丘"弧度 */
-        var dome = (1 - rr / def.radius) * 0.35;
-        var y = def.y + dome + (Math.random() - 0.5) * 0.22; // 抖动：避免军训队列般的死板
+        var px = 0, py = 0, pz = 0, tries = 0;
+        do {
+          /* 在圆盘里均匀随机取点：sqrt 是数学小技巧，
+             不加它球会全挤在圆心，像没搅开的芝麻糊 */
+          var rr = Math.sqrt(Math.random()) * def.radius;
+          var ang = Math.random() * Math.PI * 2;
+          /* 圆心处稍微垫高一点，层与层之间形成微微鼓起的"圆丘"弧度 */
+          var dome = (1 - rr / def.radius) * 0.3;
+          px = Math.cos(ang) * rr;
+          pz = Math.sin(ang) * rr;
+          py = def.y + dome + (Math.random() - 0.5) * 0.2; // 抖动：避免军训队列般的死板
+          tries++;
+        } while (tries < 8 && nearPhotoSlot(px, py, pz)); // 最多换 8 个位置躲照片
+        if (nearPhotoSlot(px, py, pz)) continue; // 实在躲不开就放弃这颗：宁可少一颗球，不挡寿星的脸
 
-        var ballR = pickBallRadius();
-        /* 一小部分球用半透明玻璃材质，其余用珍珠材质 */
-        var mat = Math.random() < GLASS_RATIO
-          ? glassMats[Math.floor(Math.random() * glassMats.length)]
-          : pearlMats[Math.floor(Math.random() * pearlMats.length)];
+        spawnBall(px, py, pz, pickBallRadius());
+      }
 
-        var ball = new THREE.Mesh(ballGeo, mat);
-        ball.scale.setScalar(ballR);
-        ball.position.set(Math.cos(ang) * rr, y, Math.sin(ang) * rr);
-        scene.add(ball);
-
-        var item = makeFloatItem(ball, false);
-        item.baseScale = ballR; // 小球的"原始缩放"就是它的半径，动画缩放要乘在它上面
-        item.bobAmp = 0.025 + Math.random() * 0.03; // 球的呼吸极轻微，像水母轻轻一张一合
-
-        /* 梦幻漂移参数：随机方向的单位向量 + 独立振幅/频率/相位。
-           每帧位置 = 补间位置 + driftDir × sin(时间×频率 + 相位) × 振幅，
-           蛋糕形态和炸开形态都生效 —— 球海就像泡泡一样缓缓游动 */
-        item.driftDir.set(Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1);
-        if (item.driftDir.lengthSq() < 0.0001) item.driftDir.set(0, 1, 0); // 防倒霉的零向量
-        item.driftDir.normalize();
-        item.driftAmp = 0.1 + Math.random() * 0.25;   // 振幅 0.10~0.35，想飘更浪就调大
-        item.driftFreq = 0.2 + Math.random() * 0.4;   // 频率 0.2~0.6 rad/s，慢慢游才梦幻
-        item.driftPhase = Math.random() * Math.PI * 2;
-
-        floatItems.push(item);
+      /* ---- 裙边球：外缘一圈"裱花"，大小一致、间距均匀、几乎不抖动 ----
+         正是这一圈圈整齐的花边，让蛋糕的分层轮廓一眼可辨 */
+      var ringR = def.radius + 0.12; // 比山体圆盘略靠外一点，像裱花描了个边
+      var skirtCount = Math.max(8, Math.round((2 * Math.PI * ringR) / (SKIRT_R * 2.3) * scaleFactor));
+      for (var s = 0; s < skirtCount; s++) {
+        var sAng = (s / skirtCount) * Math.PI * 2; // 等分圆周，整齐才有"裱花感"
+        var sx = Math.cos(sAng) * ringR;
+        var sz = Math.sin(sAng) * ringR;
+        var sy = def.y + (Math.random() - 0.5) * 0.05;
+        if (nearPhotoSlot(sx, sy, sz)) continue; // 照片把花边"咬"出一道口子，正好镶进去
+        spawnBall(sx, sy, sz, SKIRT_R);
       }
     }
   }
 
-  /* 分段随机半径：60% 小珠(0.08~0.18) + 30% 中珠(0.18~0.30) + 10% 大珠(0.30~0.42)，
-     大大小小错落开，才像随手撒向空中的一把泡泡，而不是同一模具的弹珠 */
+  /* 分段随机半径：58% 小珠(0.10~0.20) + 32% 中珠(0.20~0.32) + 10% 大珠(0.32~0.44)，
+     大大小小错落开，才像随手撒向空中的一把泡泡，而不是同一模具的弹珠。
+     （整体比上一代略大一号：球更饱满，球间缝隙自然变小） */
   function pickBallRadius() {
     var r = Math.random();
-    if (r < 0.6) return 0.08 + Math.random() * 0.10;
-    if (r < 0.9) return 0.18 + Math.random() * 0.12;
-    return 0.30 + Math.random() * 0.12;
+    if (r < 0.58) return 0.10 + Math.random() * 0.10;
+    if (r < 0.90) return 0.20 + Math.random() * 0.12;
+    return 0.32 + Math.random() * 0.12;
   }
 
   /* 照片拍立得：白边底板 + 照片贴面（前置 0.01 防止两个平面"打架闪屏"） */
@@ -417,7 +496,6 @@
     var photoGeo = new THREE.PlaneGeometry(0.95, 0.95); // 照片本体
     var frameMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
     var loader = new THREE.TextureLoader();
-    var n = photos.length;
 
     photos.forEach(function (src, i) {
       var group = new THREE.Group();
@@ -438,11 +516,10 @@
       photo.position.set(0, 0.1, 0.01); // 稍微上移：下面留宽一点的白边，更像拍立得
       group.add(photo);
 
-      /* 点缀在球丘四周：均匀环绕 + 高度错开三层，半径比球丘略小一点，
-         看起来像"插"在球球之间的空隙里 */
-      var angle = (i / n) * Math.PI * 2 + Math.PI / n;
-      var y = 0.9 + (i % 3) * 1.1;
-      group.position.set(Math.cos(angle) * 3.9, y, Math.sin(angle) * 3.9);
+      /* 落座到 photoSlots 提前分好的"家"：均匀环绕 + 高度错开三层，
+         球球们早已在这里让出了空洞，照片正好镶进花边里 */
+      var slot = photoSlots[i];
+      group.position.set(slot.x, slot.y, slot.z);
       scene.add(group);
 
       var item = makeFloatItem(group, true);
@@ -518,10 +595,13 @@
     return new THREE.Mesh(new THREE.PlaneGeometry(1.7, 1.05), mat);
   }
 
-  /* 蜡烛 + 火焰：岁数数字正上方的那一点暖光 */
+  /* 蜡烛 + 火焰：岁数数字正上方的那一点暖光。
+     整体已缩小到上一代的约 0.6 倍 —— 蜡烛甘当配角，蛋糕才是主角 */
   function buildCandle(baseY) {
+    var CANDLE_H = 0.62; // 蜡烛杆高度（上一代是 1.0）。想再小点改成 0.5 试试
+
     /* 蜡烛杆：细细的粉白圆柱 */
-    var candleGeo = new THREE.CylinderGeometry(0.11, 0.13, 1.0, 16);
+    var candleGeo = new THREE.CylinderGeometry(0.07, 0.085, CANDLE_H, 16);
     var candleMat = new THREE.MeshPhongMaterial({
       color: 0xfff0f3,   // 粉白色，想纯白改成 0xffffff
       shininess: 50,
@@ -529,15 +609,16 @@
     });
     var candle = new THREE.Mesh(candleGeo, candleMat);
     /* 注意：圆柱的 position 是它的"正中心"而不是顶端！
-       高 1.0 的蜡烛放在 baseY+0.5，顶端才正好落在 baseY+1.0 */
-    candle.position.set(0, baseY + 0.5, 0);
+       高 CANDLE_H 的蜡烛放在 baseY + CANDLE_H/2，顶端才正好落在 baseY + CANDLE_H */
+    candle.position.set(0, baseY + CANDLE_H / 2, 0);
     scene.add(candle);
 
-    /* 烛芯：顶部一小截黑色细圆柱（高 0.14，中心在 baseY+1.05 → 顶端 = baseY+1.12） */
-    var wickGeo = new THREE.CylinderGeometry(0.018, 0.018, 0.14, 6);
+    /* 烛芯：顶部一小截黑色细圆柱（高 0.09，中心在 baseY+CANDLE_H+0.045
+       → 顶端 = baseY + CANDLE_H + 0.09） */
+    var wickGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.09, 6);
     var wickMat = new THREE.MeshBasicMaterial({ color: 0x1a1a1a });
     var wick = new THREE.Mesh(wickGeo, wickMat);
-    wick.position.set(0, baseY + 1.05, 0);
+    wick.position.set(0, baseY + CANDLE_H + 0.045, 0);
     scene.add(wick);
 
     /* ============ 火焰：泪滴形三层结构 + 光晕 + 小暖灯 ============
@@ -545,13 +626,13 @@
        flameGroup 的原点精确钉在"烛芯顶端"(x=0, z=0 永不改写)，
        摇曳只做"绕根部的微小倾斜"，根部像钉死在烛芯上，只有中上部摆动 ——
        这样相机环绕到任何角度，火焰都精确立在烛芯正上方 */
-    flameBaseY = baseY + 1.12; // 精确 = 烛芯顶端的世界高度
+    flameBaseY = baseY + CANDLE_H + 0.09; // 精确 = 烛芯顶端的世界高度
     flameGroup = new THREE.Group();
     flameGroup.position.set(0, flameBaseY, 0);
 
     /* ① 根部淡蓝紫小球：真实蜡烛火焰最底部是一圈蓝色（那里燃烧最充分），
        压扁贴在烛芯口，火苗立刻"专业"起来 */
-    var baseGeo = new THREE.SphereGeometry(0.05, 10, 8);
+    var baseGeo = new THREE.SphereGeometry(0.032, 10, 8);
     var baseMat = new THREE.MeshBasicMaterial({
       color: 0x7f9dff,   // 淡蓝紫，想更蓝改 0x5f7fff
       transparent: true,
@@ -561,21 +642,21 @@
     });
     var blueBase = new THREE.Mesh(baseGeo, baseMat);
     blueBase.scale.set(1, 0.7, 1);
-    blueBase.position.y = 0.02;
+    blueBase.position.y = 0.012;
     flameGroup.add(blueBase);
 
     /* ② 内焰：亮白-淡黄小泪滴（球体沿 y 拉长 2 倍就是泪滴形），
        底部贴在根部（position.y ≈ 半个高度） */
-    var innerGeo = new THREE.SphereGeometry(0.055, 12, 10);
+    var innerGeo = new THREE.SphereGeometry(0.034, 12, 10);
     var innerMat = new THREE.MeshBasicMaterial({ color: 0xfff7cc }); // 亮白偏暖
     var inner = new THREE.Mesh(innerGeo, innerMat);
     inner.scale.set(0.9, 2.0, 0.9); // 想火苗更细长就把中间的 2.0 调大
-    inner.position.y = 0.115;
+    inner.position.y = 0.07;
     flameGroup.add(inner);
 
     /* ③ 中焰：橙黄-橙红稍大的半透明泪滴套在外面。
        AdditiveBlending = 和后面的颜色"叠着发光"，亮处更亮，黑边自动消失 */
-    var outerGeo = new THREE.SphereGeometry(0.1, 12, 10);
+    var outerGeo = new THREE.SphereGeometry(0.062, 12, 10);
     var outerMat = new THREE.MeshBasicMaterial({
       color: 0xff8a3d,      // 橙黄偏红，想更红改 0xff6a2a
       transparent: true,
@@ -585,12 +666,12 @@
     });
     var outer = new THREE.Mesh(outerGeo, outerMat);
     outer.scale.set(1, 2.1, 1);
-    outer.position.y = 0.19; // 底部略低于内焰底部，刚好包住蓝色根部
+    outer.position.y = 0.115; // 底部略低于内焰底部，刚好包住蓝色根部
     flameGroup.add(outer);
 
     /* ④ 光晕贴片：canvas 上画一个径向渐变（中心暖黄 → 向外透明）。
        Sprite 永远正对镜头，且 center 默认 (0.5,0.5) = 贴片正中心对齐 position，
-       我们把 position 放在泪滴的视觉中心(y≈0.24)，光晕就正好抱住整团火苗，
+       我们把 position 放在泪滴的视觉中心(y≈0.145)，光晕就正好抱住整团火苗，
        不会出现"光斑飘在火焰上方"的错位感 */
     var glowMat = new THREE.SpriteMaterial({
       map: makeGlowTexture(),
@@ -600,14 +681,14 @@
       depthWrite: false
     });
     flameGlow = new THREE.Sprite(glowMat);
-    flameGlow.scale.set(1.5, 1.8, 1); // 想光晕更大就调大这两个数
-    flameGlow.position.y = 0.24;
+    flameGlow.scale.set(0.95, 1.12, 1); // 想光晕更大就调大这两个数
+    flameGlow.position.y = 0.145;
     flameGroup.add(flameGlow);
 
     /* ⑤ 火焰专属小暖灯：放在火焰中心，暖橙色。
-       distance=9 表示光照到 9 格远就衰减没了，只照亮蜡烛附近的球球 */
-    flameLight = new THREE.PointLight(0xffa050, 1.3, 9, 2);
-    flameLight.position.y = 0.22;
+       distance=6 表示光照到 6 格远就衰减没了，只照亮蜡烛附近的球球 */
+    flameLight = new THREE.PointLight(0xffa050, 0.85, 6, 2);
+    flameLight.position.y = 0.135;
     flameGroup.add(flameLight);
 
     scene.add(flameGroup);
@@ -667,7 +748,8 @@
   /* 小球炸开落点：以蛋糕中心为球心撒满大球壳，分两条带 ——
      约 45% 落在"近景带"(8~16)：正好萦绕在炸开后飞到相机前的照片簇四周，
        照片被漫天泡泡簇拥着，中央区域不会空荡；
-     其余落在"远景带"(13~24)：把屏幕的前后左右都填满，才是"球海"而不是"球雾" */
+     其余落在"远景带"(13~24)：把屏幕的前后左右都填满，才是"球海"而不是"球雾"。
+     初始化时算一份，每次炸开还会重算一遍（每次都换个新花样） */
   function precomputeBallExplodeTargets() {
     var center = new THREE.Vector3(0, CENTER_Y, 0);
     floatItems.forEach(function (item) {
@@ -687,13 +769,14 @@
     });
   }
 
-  /* 照片炸开落点：飞到"相机正前方的中央区域"，松松垮垮聚成一簇。
+  /* 照片炸开落点：飞到"离相机很近的正前方"，松松垮垮聚成一簇 ——
+     炸开这一刻寿星就是大明星，照片必须怼到镜头前放大展示！
      故意不排整齐 —— 横七竖八才像撒在空中的一叠拍立得。
      为什么不在初始化时算？因为相机一直在绕圈，"相机面前"每时每刻都在变 */
   function computePhotoExplodeTargets() {
     var n = photoItems.length;
     if (n === 0) return;
-    var viewDist = Math.max(6, orbitDist * 0.55); // 照片簇离相机多远（比蛋糕近，才有"怼脸展示"感）
+    var viewDist = Math.max(5, orbitDist * 0.45); // 照片簇离相机多远（比上一代 0.55 更近 = 更"怼脸"）
     var forward = new THREE.Vector3();
     camera.getWorldDirection(forward);            // 相机当前朝哪看
     /* 以相机朝向为基准，建一对"右方向/上方向"的坐标轴，用来散布照片 */
@@ -702,14 +785,47 @@
 
     photoItems.forEach(function (item) {
       var target = camera.position.clone().addScaledVector(forward, viewDist);
-      /* 在中央区域里随机偏移：横向 ±2.6，纵向 ±1.8，就像随手撒出去的一把照片 */
-      target.addScaledVector(right, (Math.random() - 0.5) * 5.2);
-      target.addScaledVector(up, (Math.random() - 0.5) * 3.6);
+      /* 在中央区域里随机偏移：横向 ±2.4，纵向 ±1.7，松散的一小簇 */
+      target.addScaledVector(right, (Math.random() - 0.5) * 4.8);
+      target.addScaledVector(up, (Math.random() - 0.5) * 3.4);
       item.explode.copy(target);
-      /* 每张放大倍数略有不同（2.0~2.5 倍）；手机站得远，
-         要按比例放得更大，屏幕上看起来才一样大 */
-      item.explodeScale = (PHOTO_EXPLODE_SCALE + (Math.random() - 0.5) * 0.5) * (viewDist / 7);
+      /* 每张放大倍数略有不同（3.1~3.7 倍）；手机站得远，
+         要按比例放得更大，屏幕上看起来才一样大（viewDist/7 就是距离补偿） */
+      item.explodeScale = (PHOTO_EXPLODE_SCALE + (Math.random() - 0.5) * 0.6) * (viewDist / 7);
     });
+  }
+
+  /* 清出"照片走廊"：炸开后，相机和照片簇之间连线周围是一根看不见的圆筒
+     （半径 CORRIDOR_R）。落点掉进圆筒里的球，会被沿"垂直于走廊"的方向
+     轻轻推出去（上下左右皆可）—— 照片主体永远不被球球遮挡 */
+  function clearPhotoCorridor() {
+    if (photoItems.length === 0) return;
+    var a = camera.position.clone();      // 走廊起点：相机
+    var b = new THREE.Vector3(0, 0, 0);   // 走廊终点：照片簇中心（各照片落点的平均）
+    for (var i = 0; i < photoItems.length; i++) b.add(photoItems[i].explode);
+    b.multiplyScalar(1 / photoItems.length);
+
+    var ab = new THREE.Vector3().subVectors(b, a);
+    var abLen2 = ab.lengthSq();
+    if (abLen2 < 0.0001) return;
+
+    for (var j = 0; j < floatItems.length; j++) {
+      var item = floatItems[j];
+      if (item.isPhoto) continue;
+      var p = item.explode;
+      /* p 在走廊线段上的"投影位置"t：0=相机处，1=照片簇处。
+         头尾稍微放宽一点(-0.1~1.15)，镜头后面和照片背后也别堵着 */
+      var t = ((p.x - a.x) * ab.x + (p.y - a.y) * ab.y + (p.z - a.z) * ab.z) / abLen2;
+      if (t < -0.1 || t > 1.15) continue;
+      var tc = clamp(t, 0, 1);
+      var qx = a.x + ab.x * tc, qy = a.y + ab.y * tc, qz = a.z + ab.z * tc; // 走廊轴线上离 p 最近的点
+      var dx = p.x - qx, dy = p.y - qy, dz = p.z - qz;
+      var d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (d >= CORRIDOR_R) continue;      // 在走廊外面，不用挪
+      if (d < 0.001) { dx = 0; dy = 1; dz = 0; d = 1; } // 倒霉正好在轴线上：往上推
+      var push = (CORRIDOR_R + Math.random() * 1.6) / d;
+      p.set(qx + dx * push, qy + dy * push, qz + dz * push);
+    }
   }
 
   /* ============================================================
@@ -725,7 +841,11 @@
     if (shouldExplode === exploded && !tweenActive) return; // 状态没变，不做无用功
     exploded = shouldExplode;
 
-    if (exploded) computePhotoExplodeTargets(); // 按"此刻"的相机位置算照片簇
+    if (exploded) {
+      precomputeBallExplodeTargets(); // 每次炸开重新撒一遍落点（几百个随机数，眨眼算完）
+      computePhotoExplodeTargets();   // 按"此刻"的相机位置算照片簇
+      clearPhotoCorridor();           // 把挡在"照片↔相机走廊"里的球请出去
+    }
 
     floatItems.forEach(function (item) {
       item.from.copy(item.cur);           // 起点 = 现在在哪（打断也平滑）
@@ -825,7 +945,7 @@
 
       /* 绕根部倾斜（±0.06 弧度内）：旋转中心就是火焰组原点 = 烛芯顶端，
          所以越靠近火苗尖摆得越明显，根部纹丝不动。
-         火苗高约 0.42，尖端最大摆幅 ≈ 0.42×0.051 ≈ 0.02，只有高度的 5% */
+         火苗高约 0.25，尖端最大摆幅 ≈ 0.25×0.051 ≈ 0.013，只有高度的 5% */
       flameGroup.rotation.z = Math.sin(tSec * 7.3) * 0.045 + (Math.random() - 0.5) * 0.012;
       flameGroup.rotation.x = Math.cos(tSec * 6.1) * 0.045 + (Math.random() - 0.5) * 0.012;
 
@@ -834,8 +954,8 @@
       var s = 0.9 + ((flameFlicker - 0.7) / 0.3) * 0.25;
       flameGroup.scale.set(1 - (s - 1) * 0.5, s, 1 - (s - 1) * 0.5);
 
-      /* 灯光和光晕跟着心情值同步呼吸 */
-      flameLight.intensity = 0.7 + flameFlicker;            // 1.4~1.7 之间轻轻呼吸
+      /* 灯光和光晕跟着心情值同步呼吸（小蜡烛配小暖灯，亮度也同比瘦身） */
+      flameLight.intensity = 0.35 + flameFlicker * 0.55;   // 0.74~0.9 之间轻轻呼吸
       flameGlow.material.opacity = 0.55 + flameFlicker * 0.35; // 0.8~0.9
     }
 
