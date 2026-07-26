@@ -4,7 +4,8 @@
  * 这个文件负责五件事：
  *   1. 搭舞台：纯黑背景 + 满天星星（像把房间灯关掉，只留蛋糕上的烛光）
  *   2. 堆蛋糕：四百多颗"亮晶晶"的小球（瓷珠 + 通透玻璃珠，带环境反射高光）
- *      沿 5 层同心圆环排成"镂空壳体"蛋糕 —— 层内部留空，从层间缝隙能
+ *      沿 4 层"阶梯式"同心圆环排成镂空壳体蛋糕（直径层层跳变 ≥30%，
+ *      像真蛋糕一层摞一层）—— 层内部留空，从层间台阶缝隙能
  *      透出背后的黑背景和星光，像一串串彩色小灯泡勾出蛋糕的剪影；
  *      蛋糕周围还有一小撮慢悠悠漂浮的"氛围散球"，添一份梦幻感
  *   3. 立招牌：蛋糕正上方紧凑叠着一小簇（从下到上）—— 发光岁数数字、
@@ -48,20 +49,23 @@
   ];
   var COOL_RATIO = 0.18; // 冷色球出现的概率：0.18 = 大约每 6 颗里 1 颗，你可以改成 0.1 更暖
 
-  /* 蛋糕结构：5 层"镂空壳体"（整体比上一代放大约 1.3 倍，主角气场更足）。
-     每层只在轮廓上摆 1~2 圈同心圆环的球，层内部留空 —— 像用彩灯串
-     沿蛋糕边一圈圈绕出来，从层与层之间的缝隙能透出后面的黑背景和星光。
-     radius = 外圈半径；y = 这一层的高度；rings = 这一层绕几圈（顶层 1 圈，
-     另加 1 颗中心封口球，像蛋糕尖上的樱桃）。
-     想让蛋糕更胖：把 radius 整体调大；想更高：把 y 间距拉大 */
+  /* 蛋糕结构：4 层"阶梯式镂空壳体"，像真蛋糕一样一层摞一层 ——
+     相邻两层直径差 ≥30%（直径比 ≤0.7），层与层之间有清清楚楚的"台阶"，
+     不再是从宽到窄平滑收窄的山坡。
+     每层是一个"扁平圆柱台"：底边圈 + 顶边圈（垂直距离 = LAYER_THICK 层厚）
+     围出明确的层厚度；相邻层的 y 间距 = 层厚 + LAYER_GAP 台阶缝，
+     从缝隙能透出背后的黑背景和星光，断层一眼就能看到。
+     radius = 外圈半径；y = 这一层"底边圈"的高度（顶边圈在 y + LAYER_THICK）。
+     想让台阶更夸张：把 LAYER_GAP 调大；想每层更厚实：调大 LAYER_THICK */
+  var LAYER_THICK = 0.80; // 层厚（顶边圈到底边圈），0.7~0.9 之间最像真蛋糕
+  var LAYER_GAP = 1.15;   // 台阶缝隙（上一层底圈到下一层顶圈），1.1~1.3 断层最清楚
   var LAYERS = [
-    { radius: 5.45, y: 0.60, rings: 2 },
-    { radius: 4.40, y: 1.45, rings: 2 },
-    { radius: 3.45, y: 2.25, rings: 2 },
-    { radius: 2.55, y: 3.00, rings: 2 },
-    { radius: 1.60, y: 3.70, rings: 1 }
-  ]; // 壳体约 355 球 + 内馅点缀约 12 颗（半径>2.2 的 4 层 × 3 颗）+ 氛围散球约 85 颗 ≈ 桌面端 450 球
-     //（手机端自动×0.45 ≈ 200 球保帧率；有照片时轮廓球让位会再少几十颗）
+    { radius: 5.2, y: 0.60 }, // 最底层（直径 10.4）
+    { radius: 3.6, y: 2.55 }, // = 0.60 + 层厚0.80 + 台阶缝1.15；直径比 3.6/5.2 ≈ 0.69 ≤0.7
+    { radius: 2.5, y: 4.50 }, // = 2.55 + 0.80 + 1.15；直径比 2.5/3.6 ≈ 0.69 ≤0.7
+    { radius: 1.6, y: 6.45 }  // = 4.50 + 0.80 + 1.15；直径比 1.6/2.5 = 0.64 ≤0.7
+  ]; // 壳体约 416 球 + 内馅点缀约 9 颗（半径>2.2 的 3 层 × 3 颗）+ 氛围散球约 85 颗 ≈ 桌面端 510 球
+     //（手机端自动×0.45 ≈ 230 球保帧率；有照片时轮廓球让位会再少几十颗）
 
   /* 轮廓环三兄弟：球沿圆周等距排列，RING_GAP 是相邻球心的目标间距
      （≈ 球径×1.15，既不重叠成串也不露大缺口）；内圈沿半径方向缩进
@@ -84,7 +88,13 @@
   var GLASS_EMISSIVE = 0.36; // 玻璃珠自发光：0.3~0.45 之间通透又亮堂，像水果硬糖里裹着小灯泡
 
   var STAR_COUNT = 700;   // 星星数量（手机端减半）。想更梦幻改成 1200 试试
-  var CENTER_Y = 3.9;     // 蛋糕+招牌整簇的"心脏"高度：相机盯着它看，小球从它往外炸
+  var CENTER_Y = 3.9;     // 炸开球海的球心高度（蛋糕身体的"心脏"，小球从它往外炸）。
+                          // 注意：相机注视点不用它！改用 contentCenterY（见 fitCameraToContent）
+
+  /* 金色标题的站位参数：既用来摆放标题，也用来算"内容包围盒"的顶边，
+     两处共用同一组数，改了一处构图自动跟上，不会顾此失彼 */
+  var TITLE_DY = 3.20; // 标题悬在蛋糕顶上方的高度。想标题更靠近蛋糕就调小
+  var TITLE_H = 1.25;  // 标题牌子的实际高度（算画面总高时要用它的上半边）
 
   var ORBIT_SECONDS = 25; // 相机绕蛋糕转一圈的秒数（改小→转得更快，会晕哦）
   var EXPLODE_MS = 1000;  // 炸开/恢复动画时长（0.8~1.2 秒之间最舒服）
@@ -109,8 +119,9 @@
   var floatItems = [];        // 所有"会漂浮 + 会炸开"的东西（小球 + 照片）
   var photoItems = [];        // 只装照片（floatItems 的子集，炸开时单独算目标位）
   var photoSlots = [];        // 每张照片的"家"坐标：建球时照着它让位，建照片时照着它落座
-  var orbitDist = 14;         // 相机到蛋糕中心的距离（初始化时按屏幕比例算）
-  var camHeight = 4.4;        // 相机高度（蛋糕放大了，机位也抬高一点）
+  var orbitDist = 14;         // 相机到蛋糕中心的水平距离（fitCameraToContent 会按包围盒重算）
+  var camHeight = 4.4;        // 相机高度（同上，会被重算成"注视点 + 距离的10%"）
+  var contentCenterY = CENTER_Y; // 相机注视点 = 内容包围盒的正中心（初始化时精算）
 
   /* 蜡烛火焰相关的零件（每帧摇曳动画要用） */
   var flameGroup = null;      // 火焰整体（蓝根+内焰+中焰+光晕+点光源都挂它身上）
@@ -134,6 +145,39 @@
   /* 把 x 限制在 [min, max] 之间（算相机距离时用，防止太远/太近） */
   function clamp(x, min, max) {
     return Math.min(max, Math.max(min, x));
+  }
+
+  /* 内容包围盒：从"金色标题顶端"到"蛋糕最底层底边"的完整范围。
+     相机构图就靠它 —— 注视点对准它的正中心、距离按它的高和宽算，
+     不管桌面横屏还是手机竖屏，蛋糕+招牌整簇都能刚好装进画面，
+     上下留白天然相等（不会再"上半屏空着、蛋糕底部被切掉"） */
+  function computeContentBounds() {
+    var topY = LAYERS[LAYERS.length - 1].y + LAYER_THICK + 0.35 // 顶层封口球顶端
+      + TITLE_DY + TITLE_H / 2;                                 // 再叠上标题的上边缘
+    var bottomY = LAYERS[0].y - SKIRT_R; // 最底层底圈球的下缘
+    return {
+      H: topY - bottomY,                 // 内容总高度
+      centerY: (topY + bottomY) / 2,     // 内容正中心 = 相机注视点
+      halfW: LAYERS[0].radius + BALL_R_MAX + 0.6 // 内容半宽 = 最底层半径 + 球径 + 一点边距
+    };
+  }
+
+  /* 构图公式（横屏竖屏同一套，resize 时也走这里）：
+     ① 注视点 = 内容中心 contentCenterY —— 上下留白自然相等；
+     ② 距离取"高度刚好放下"和"宽度刚好放下"两者中较远的那个：
+        distV = (H/2) / (tan(fov/2) × 0.72)        → 内容高度占屏 72%，上下各留约 14%
+        distW = halfW / (tan(fov/2) × aspect × 0.85) → 内容宽度占屏 85%，左右各留约 7%
+        （竖屏手机 aspect 小，distW 会变大 → 自动站远，蛋糕底层绝不顶出屏幕）
+     ③ 相机高度 = 注视点 + 距离的 10%，形成轻微俯视，蛋糕层叠的台阶更有立体感。
+     想让画面更紧凑：把 0.72 / 0.85 调大；想更松弛、星星更多：调小 */
+  function fitCameraToContent() {
+    var b = computeContentBounds();
+    contentCenterY = b.centerY;
+    var halfFovTan = Math.tan((camera.fov / 2) * Math.PI / 180);
+    var distV = (b.H / 2) / (halfFovTan * 0.72);
+    var distW = b.halfW / (halfFovTan * camera.aspect * 0.85);
+    orbitDist = clamp(Math.max(distV, distW) * 1.05, 10, 40); // ×1.05 留 5% 安全边，防球漂移出画
+    camHeight = contentCenterY + orbitDist * 0.10;
   }
 
   /* ============================================================
@@ -172,12 +216,11 @@
     var fov = isMobile ? 62 : 55;
     camera = new THREE.PerspectiveCamera(fov, window.innerWidth / window.innerHeight, 0.1, 300);
 
-    /* 相机距离：要保证"最宽的那层球丘"正好能进画面。
-     类比：拍照时人离蛋糕多远，取决于你的镜头有多宽（aspect）。
-     竖屏手机 aspect 小 → 要站远一点；电脑宽屏 → 可以站近点 */
-    var fitHalfWidth = LAYERS[0].radius + BALL_R_MAX + 0.6; // 蛋糕最宽处的一半 + 一点边距
-    var halfFovTan = Math.tan((fov / 2) * Math.PI / 180);
-    orbitDist = clamp(fitHalfWidth / (halfFovTan * camera.aspect), 10, 26); // 蛋糕放大后允许更近一点，主角感更足
+    /* 构图居中（修复"上半屏大片空白、蛋糕底部溢出被切"）：
+     不再拍脑袋盯固定高度，而是先算"内容包围盒"（标题顶 → 蛋糕底），
+     注视点对准包围盒正中心，距离按 fov 和屏幕比例精算 ——
+     上下留白大致相等，整个内容永远完整在画面里（公式见 fitCameraToContent） */
+    fitCameraToContent();
 
     renderer = new THREE.WebGLRenderer({ antialias: !isMobile }); // 手机关抗锯齿省电
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); // 高分屏最多 2 倍，再高性能浪费
@@ -217,7 +260,7 @@
        紧凑的一小簇叠在蛋糕正上方（金色名牌在最上方），全部加入
        billboards 每帧面向相机。各元素间隙保持 0.12~0.17，匀称不挤不散；
        想整簇更紧凑，把下面几个 +数字 等比例减小即可 */
-    var cakeTopY = LAYERS[LAYERS.length - 1].y + 0.35; // 顶层封口球顶端
+    var cakeTopY = LAYERS[LAYERS.length - 1].y + LAYER_THICK + 0.35; // 顶层封口球顶端（顶边圈 + 樱桃球）
 
     if (age !== '') {
       var agePlate = buildAgePlate(age);
@@ -250,9 +293,9 @@
       glowColor: '#ffd700',
       glowBlur: 34,           // 想金色光晕更大就调大它
       planeW: 5.4,            // 比上一代再缩小约 35%，悬在整簇最上方
-      planeH: 1.25
+      planeH: TITLE_H         // 与构图包围盒共用同一个高度常量
     });
-    titlePlate.position.set(0, cakeTopY + 3.20, 0);
+    titlePlate.position.set(0, cakeTopY + TITLE_DY, 0);
     scene.add(titlePlate);
     billboards.push(titlePlate);
 
@@ -358,11 +401,11 @@
   function computePhotoSlots(n) {
     photoSlots = [];
     for (var i = 0; i < n; i++) {
-      var layerDef = LAYERS[i % 3]; // 轮流嵌在最下面三层的外轮廓环上（0/5/10 张都匀称）
+      var layerDef = LAYERS[i % 3]; // 轮流嵌在最下面三层的外轮廓上（底层最宽，照片最显眼；0/5/10 张都匀称）
       var angle = (i / n) * Math.PI * 2 + Math.PI / n; // 均匀环绕
       photoSlots.push({
         x: Math.cos(angle) * layerDef.radius,
-        y: layerDef.y + 0.05, // 正好骑在轮廓环上：球环让位后照片镶进缺口里
+        y: layerDef.y + LAYER_THICK * 0.5, // 骑在"层厚的正中间"：底圈和顶圈都会让位，照片正好镶进台阶侧面的花边里
         z: Math.sin(angle) * layerDef.radius
       });
     }
@@ -378,7 +421,7 @@
     return false;
   }
 
-  /* 镂空壳体蛋糕：几百颗球沿 5 层同心圆环排列勾勒轮廓，层内部留空。
+  /* 镂空壳体蛋糕：几百颗球沿 4 层阶梯式同心圆环排列勾勒轮廓，层内部留空。
      allowHalo = 是否允许给球加光晕贴片（手机端不加，省性能） */
   function buildBallCake(scaleFactor, allowHalo) {
     /* 几何体和材质尽量"共用"：400 多个球共用 1 个球体模型 + 十几种材质，
@@ -498,22 +541,25 @@
 
     for (var layer = 0; layer < LAYERS.length; layer++) {
       var def = LAYERS[layer];
+      var topEdgeY = def.y + LAYER_THICK; // 这一层"顶边圈"的高度
 
-      /* ---- 外圈：这一层的轮廓剪影（最外圈即轮廓，整齐最重要） ---- */
+      /* ---- 底边外圈 + 顶边外圈：同一半径、垂直相距一个层厚，
+         两圈一上一下围出"扁平圆柱台"的侧壁剪影（真蛋糕的层侧面）。
+         两圈角度错半格，像砖缝错开，侧面看起来更密实整齐 ---- */
       var outerCount = Math.max(8, Math.round((2 * Math.PI * def.radius / RING_GAP) * scaleFactor));
       spawnRing(def.radius, def.y, outerCount, 0);
+      spawnRing(def.radius, topEdgeY, outerCount, Math.PI / outerCount);
 
-      /* ---- 内圈：沿半径缩进 RING_INSET + 抬高 0.18 + 角度错半格，
-         两圈套出"壳体厚度"；层内部留空，光从缝隙里透过去 ---- */
-      if (def.rings > 1) {
-        var innerR = def.radius - RING_INSET;
-        var innerCount = Math.max(8, Math.round((2 * Math.PI * innerR / RING_GAP) * scaleFactor));
-        spawnRing(innerR, def.y + 0.18, innerCount, Math.PI / innerCount);
-      }
+      /* ---- 顶边内圈：沿半径缩进 RING_INSET + 再抬高 0.18 + 角度错半格，
+         像这一层的"上表面花边"，壳体立刻有了厚度感；
+         层内部照旧留空，光从层间台阶缝隙里透过去 ---- */
+      var innerR = def.radius - RING_INSET;
+      var innerCount = Math.max(8, Math.round((2 * Math.PI * innerR / RING_GAP) * scaleFactor));
+      spawnRing(innerR, topEdgeY + 0.18, innerCount, Math.PI / innerCount);
 
       /* ---- 顶层封口：小环正中心补一颗球，像蛋糕尖上的樱桃 ---- */
       if (layer === LAYERS.length - 1) {
-        spawnBall(0, def.y + 0.10, 0, SKIRT_R, 0.08);
+        spawnBall(0, topEdgeY + 0.12, 0, SKIRT_R, 0.08);
       }
 
       /* ---- 可选的"悬浮内馅"：层内极稀疏点缀几颗（总量 ≤10%），
@@ -523,7 +569,7 @@
           var fa = Math.random() * Math.PI * 2;
           var fr = Math.random() * def.radius * 0.5;
           var fx = Math.cos(fa) * fr, fz = Math.sin(fa) * fr;
-          var fy = def.y + 0.15 + (Math.random() - 0.5) * 0.2;
+          var fy = def.y + LAYER_THICK * 0.5 + (Math.random() - 0.5) * 0.2; // 飘在层厚正中
           if (nearPhotoSlot(fx, fy, fz)) continue; // 同样不挡寿星的脸
           spawnBall(fx, fy, fz, pickBallRadius(), 0.2);
         }
@@ -537,7 +583,7 @@
       var aAng = Math.random() * Math.PI * 2;
       var aR = LAYERS[0].radius + 1.3 + Math.random() * 4.5; // 离蛋糕 1.3~5.8 远的一圈空间
       var ax = Math.cos(aAng) * aR, az = Math.sin(aAng) * aR;
-      var ay = -0.5 + Math.random() * 5.2; // 从蛋糕底一直飘到招牌簇旁边
+      var ay = -0.5 + Math.random() * (LAYERS[LAYERS.length - 1].y + LAYER_THICK + 0.8); // 从蛋糕底一直飘到顶层花边旁
       if (nearPhotoSlot(ax, ay, az)) continue;
       spawnBall(ax, ay, az, pickBallRadius(), 0.6); // 散球漂得更"浪"一点
     }
@@ -946,7 +992,7 @@
       camHeight + Math.sin(tSec * 0.3) * 0.4,
       Math.cos(ang) * orbitDist
     );
-    camera.lookAt(0, CENTER_Y, 0);
+    camera.lookAt(0, contentCenterY, 0); // 注视内容包围盒正中心：上下留白相等，不再"上空下挤"
 
     /* 2. 推进炸开/恢复补间动画 */
     if (tweenActive) {
@@ -1026,11 +1072,15 @@
     renderer.render(scene, camera);
   }
 
-  /* 窗口大小变化（旋转手机、拖窗口）：重新匹配画布和相机比例 */
+  /* 窗口大小变化（旋转手机、拖窗口）：重新匹配画布和相机比例，
+     并按"同一套构图公式"重算注视点和距离 —— 转竖屏会自动站远，
+     蛋糕底层依然完整在画面里、不被屏幕下缘裁切 */
   function onResize() {
     if (!renderer || !camera) return;
+    camera.fov = window.innerWidth < 600 ? 62 : 55; // 和初始化同一条规则：窄屏视野角开大
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+    fitCameraToContent(); // 注视点 = 内容中心，距离按新 fov/aspect 重算
   }
 })();
