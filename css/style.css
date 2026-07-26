@@ -1,15 +1,17 @@
 /* ============================================================
-   魔法赛博生日蛋糕 · 全局样式
-   设计基调：纯黑宇宙 + 青/品红/紫 三色霓虹辉光（赛博朋克）
+   Happy Birthday · 全局样式
+   设计基调：深邃暗紫黑 + 细金线 + 金色衬线标题（City Pop 成人美学）
    颜色集中在 :root 变量里，想换主题色只改这几行就行
    ============================================================ */
 
 :root {
-  --neon-cyan: #0ff;      /* 青：主色调（边框、输入框、主按钮） */
-  --neon-magenta: #f0f;   /* 品红：强调色（标题光晕、次按钮） */
-  --neon-purple: #9d4edd; /* 紫：辅助色（说明文字、"预置"标签） */
-  --bg-black: #000;       /* 全局纯黑背景 */
-  --danger: #ff3355;      /* 校验失败的红色 */
+  --gold: #d4af37;          /* 主金色：标题、聚焦边框、主按钮 */
+  --gold-deep: #c9a227;     /* 深一度的金：主按钮底色 */
+  --gold-line: rgba(212, 175, 55, 0.38);  /* 细金描边（卡片、按钮） */
+  --bg-deep: #0b0912;       /* 深邃暗紫黑背景 */
+  --ink: #f2ecdd;           /* 暖白正文色（纯白太刺眼） */
+  --ink-dim: rgba(242, 236, 221, 0.55);   /* 次级说明文字 */
+  --danger: #d96a6a;        /* 校验失败的柔和红 */
 }
 
 * {
@@ -19,8 +21,8 @@
 }
 
 html, body {
-  background: var(--bg-black);
-  color: #fff;
+  background: var(--bg-deep);
+  color: var(--ink);
   /* 系统字体栈：不加载网络字体，断网双击打开也能秒开 */
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
                "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
@@ -46,94 +48,81 @@ html, body {
   align-items: center;
   justify-content: center;
   padding: 24px 16px;
-  /* 氛围是三层背景叠出来的：两团霓虹光晕 + 淡淡青色网格线 + 纯黑底，
+  /* 氛围：暗紫黑底 + 上下两团极淡的紫/蓝光晕，克制不抢戏。
      全部是 CSS 画的，不需要任何图片素材 */
   background:
-    radial-gradient(ellipse 60% 40% at 20% 10%, rgba(255, 0, 255, 0.10), transparent 70%),
-    radial-gradient(ellipse 60% 40% at 80% 90%, rgba(0, 255, 255, 0.08), transparent 70%),
-    repeating-linear-gradient(0deg, rgba(0, 255, 255, 0.04) 0 1px, transparent 1px 44px),
-    repeating-linear-gradient(90deg, rgba(0, 255, 255, 0.04) 0 1px, transparent 1px 44px),
-    var(--bg-black);
+    radial-gradient(ellipse 75% 55% at 50% -5%, rgba(96, 64, 140, 0.20), transparent 70%),
+    radial-gradient(ellipse 65% 50% at 50% 105%, rgba(48, 58, 120, 0.16), transparent 70%),
+    var(--bg-deep);
 }
 
-/* 居中卡片：半透明深色底 + 青色描边 + 毛玻璃，浮在黑底上的"玻璃卡片" */
+/* 居中卡片：细金描边 + 极轻毛玻璃，无厚重发光 */
 .card {
   width: 100%;
   max-width: 460px;
-  padding: 30px 26px;
-  border: 1px solid rgba(0, 255, 255, 0.45);
-  border-radius: 18px;
-  background: rgba(12, 12, 24, 0.78);
-  box-shadow:
-    0 0 30px rgba(0, 255, 255, 0.18),
-    0 0 70px rgba(255, 0, 255, 0.10);
-  backdrop-filter: blur(8px);  /* 毛玻璃；老浏览器会自动忽略这条，不影响功能 */
+  padding: 44px 38px;
+  border: 1px solid var(--gold-line);
+  border-radius: 8px;
+  background: rgba(18, 14, 26, 0.72);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);  /* 只有向下的深邃投影，让卡片"浮"起来 */
+  backdrop-filter: blur(10px);  /* 毛玻璃；老浏览器会自动忽略这条，不影响功能 */
 }
 
-/* 霓虹标题：多层 text-shadow 叠出"光晕由近到远扩散"的灯管感 */
+/* 金色衬线大标题：优雅克制，不闪不呼吸 */
 .title {
   text-align: center;
-  font-size: 30px;
-  font-weight: 800;
-  letter-spacing: 2px;
-  color: #fff;
-  text-shadow:
-    0 0 6px #fff,
-    0 0 14px var(--neon-cyan),
-    0 0 32px var(--neon-cyan),
-    0 0 60px var(--neon-magenta);
-  animation: title-breathe 3s ease-in-out infinite;
-}
-
-/* 标题"呼吸"动画：光晕轻微强弱变化，像真的霓虹灯管在闪 */
-@keyframes title-breathe {
-  0%, 100% { text-shadow: 0 0 6px #fff, 0 0 14px var(--neon-cyan), 0 0 32px var(--neon-cyan), 0 0 60px var(--neon-magenta); }
-  50%      { text-shadow: 0 0 4px #fff, 0 0 10px var(--neon-cyan), 0 0 22px var(--neon-cyan), 0 0 42px var(--neon-magenta); }
+  font-family: 'Playfair Display', 'Didot', 'Bodoni MT', Georgia, 'Times New Roman', serif;
+  font-size: 40px;
+  font-weight: 600;
+  letter-spacing: 4px;
+  color: var(--gold);
 }
 
 .subtitle {
-  margin-top: 10px;
+  margin-top: 12px;
   text-align: center;
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.55);
+  letter-spacing: 1px;
+  color: var(--ink-dim);
 }
 
-/* 每个输入框上方的小标签 */
+/* 每个输入框上方的小标签：小写字母 + 宽字距，像杂志页眉 */
 .field-label {
   display: block;
-  margin: 20px 0 8px;
-  font-size: 14px;
-  color: var(--neon-cyan);
-  text-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
+  margin: 22px 0 8px;
+  font-size: 12px;
+  letter-spacing: 2px;
+  text-transform: lowercase;
+  color: rgba(212, 175, 55, 0.78);
 }
 
-/* 霓虹输入框：暗底 + 青边，聚焦时青色发光 */
+/* 极简输入框：透明底 + 细线边框，聚焦时细线染金 */
 .neon-input {
   width: 100%;
   min-height: 44px;      /* 44px：手机端"手指好按"的最小高度标准 */
   padding: 10px 14px;
   font-size: 16px;       /* iOS 上字号 <16px 聚焦时会自动放大页面，16px 可避免 */
-  color: #fff;
-  background: rgba(0, 0, 0, 0.6);
-  border: 1px solid rgba(0, 255, 255, 0.45);
-  border-radius: 10px;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid rgba(242, 236, 221, 0.22);
+  border-radius: 4px;
   outline: none;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .neon-input::placeholder {
-  color: rgba(0, 255, 255, 0.3);
+  color: rgba(242, 236, 221, 0.28);
 }
 
 .neon-input:focus {
-  border-color: var(--neon-cyan);
-  box-shadow: 0 0 16px rgba(0, 255, 255, 0.55);
+  border-color: var(--gold);
+  box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.30);  /* 一圈细细的金边，不发光 */
 }
 
-/* 校验失败状态：红色发光边框（.input-error 由 JS 添加，改对后 JS 会移除） */
+/* 校验失败状态：柔和红框（.input-error 由 JS 添加，改对后 JS 会移除） */
 .neon-input.input-error {
   border-color: var(--danger);
-  box-shadow: 0 0 16px rgba(255, 51, 85, 0.8);
+  box-shadow: 0 0 12px rgba(217, 106, 106, 0.30);
 }
 
 /* 抖动动画：左右快速晃，像老师在摇手说"这里还没填哦"（播完 JS 会移除 .shake） */
@@ -148,25 +137,24 @@ html, body {
   animation: shake 0.4s ease;
 }
 
-/* 霓虹按钮通用样式：透明底 + 发光描边，hover 时被"点亮" */
+/* 次按钮通用样式：细金描边的"幽灵按钮"，hover 时淡淡衬出金色 */
 .neon-btn {
   display: inline-block;
   min-height: 44px;
   padding: 10px 22px;
-  font-size: 16px;
-  color: var(--neon-magenta);
+  font-size: 15px;
+  letter-spacing: 2px;
+  color: var(--gold);
   background: transparent;
-  border: 2px solid var(--neon-magenta);
-  border-radius: 10px;
+  border: 1px solid var(--gold-line);
+  border-radius: 4px;
   cursor: pointer;
-  text-shadow: 0 0 8px rgba(255, 0, 255, 0.7);
-  box-shadow: 0 0 10px rgba(255, 0, 255, 0.25), inset 0 0 10px rgba(255, 0, 255, 0.10);
-  transition: box-shadow 0.2s, background 0.2s, transform 0.1s;
+  transition: border-color 0.2s, background 0.2s, color 0.2s, transform 0.1s;
 }
 
 .neon-btn:hover {
-  background: rgba(255, 0, 255, 0.12);
-  box-shadow: 0 0 24px rgba(255, 0, 255, 0.7), inset 0 0 14px rgba(255, 0, 255, 0.2);
+  border-color: var(--gold);
+  background: rgba(212, 175, 55, 0.08);
 }
 
 .neon-btn:active {
@@ -179,15 +167,14 @@ html, body {
   align-items: center;
   justify-content: center;
   width: 100%;
-  color: var(--neon-cyan);
+  color: var(--ink-dim);
   border-style: dashed;
-  border-color: rgba(0, 255, 255, 0.6);
-  text-shadow: 0 0 8px rgba(0, 255, 255, 0.6);
-  box-shadow: none;
+  border-color: rgba(242, 236, 221, 0.28);
 }
 .upload-btn:hover {
-  background: rgba(0, 255, 255, 0.08);
-  box-shadow: 0 0 16px rgba(0, 255, 255, 0.45);
+  color: var(--gold);
+  border-color: var(--gold);
+  background: rgba(212, 175, 55, 0.06);
 }
 
 /* 把原生文件选择框"藏"起来，但保留功能（label 的 for 还能触发它） */
@@ -208,12 +195,11 @@ html, body {
 }
 
 .photo-item {
-  position: relative;        /* 让删除按钮和"预置"标签能贴着角落定位 */
+  position: relative;        /* 让删除按钮和"Preset"标签能贴着角落定位 */
   aspect-ratio: 1 / 1;       /* 正方形缩略图，排起来整齐 */
-  border: 1px solid rgba(0, 255, 255, 0.35);
-  border-radius: 10px;
+  border: 1px solid rgba(212, 175, 55, 0.25);
+  border-radius: 6px;
   overflow: hidden;
-  box-shadow: 0 0 8px rgba(0, 255, 255, 0.2);
 }
 
 .photo-item img {
@@ -233,62 +219,61 @@ html, body {
   padding: 0;
   border: none;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(0, 0, 0, 0.72);
   color: var(--danger);
   font-size: 15px;
   line-height: 1;
   cursor: pointer;
-  transition: box-shadow 0.2s, color 0.2s;
+  transition: color 0.2s, background 0.2s;
 }
 .photo-del:hover {
   color: #fff;
-  box-shadow: 0 0 10px var(--danger);
+  background: rgba(217, 106, 106, 0.85);
 }
 
-/* "预置"标签：左下角小角标，告诉用户这张是自带的、不能删 */
+/* "Preset"标签：左下角小角标，告诉用户这张是自带的、不能删 */
 .preset-tag {
   position: absolute;
   left: 0;
   bottom: 0;
   padding: 2px 8px;
   font-size: 11px;
-  color: #fff;
-  background: rgba(157, 78, 221, 0.85);
-  border-top-right-radius: 8px;
+  letter-spacing: 1px;
+  color: #1a1408;
+  background: rgba(212, 175, 55, 0.88);
+  border-top-right-radius: 6px;
 }
 
 .hint {
   margin-top: 8px;
   font-size: 12px;
-  color: rgba(0, 255, 255, 0.45);
+  color: var(--ink-dim);
 }
 
 /* 摄像头用途说明：授权前先讲清楚，用户才放心点"允许" */
 .camera-note {
-  margin-top: 22px;
-  font-size: 13px;
+  margin-top: 24px;
+  font-size: 12.5px;
   line-height: 1.7;
   text-align: center;
-  color: var(--neon-purple);
-  text-shadow: 0 0 8px rgba(157, 78, 221, 0.5);
+  color: var(--ink-dim);
 }
 
-/* 主按钮：整行宽、青色霓虹，和次按钮拉开层级，一眼看到该点哪 */
+/* 主按钮：整行宽、实心金色 + 深色文字，全场唯一的"重色块"，一眼看到该点哪 */
 .enter-btn {
   display: block;
   width: 100%;
-  margin-top: 12px;
-  font-size: 18px;
+  margin-top: 14px;
+  font-size: 17px;
   font-weight: 700;
-  letter-spacing: 2px;
-  color: var(--neon-cyan);
-  border-color: var(--neon-cyan);
-  text-shadow: 0 0 8px rgba(0, 255, 255, 0.8);
-  box-shadow: 0 0 14px rgba(0, 255, 255, 0.3), inset 0 0 12px rgba(0, 255, 255, 0.12);
+  letter-spacing: 3px;
+  color: #1a1408;
+  background: linear-gradient(180deg, var(--gold), var(--gold-deep));
+  border: none;
 }
 .enter-btn:hover {
-  background: rgba(0, 255, 255, 0.10);
-  box-shadow: 0 0 28px rgba(0, 255, 255, 0.75), inset 0 0 16px rgba(0, 255, 255, 0.2);
+  background: linear-gradient(180deg, #e2c254, var(--gold));  /* hover 微亮 */
+  box-shadow: 0 6px 22px rgba(212, 175, 55, 0.22);            /* 一点点金色投影即可 */
 }
 .enter-btn:disabled {
   opacity: 0.55;
@@ -297,29 +282,29 @@ html, body {
 
 /* 摄像头被拒后的降级入口区 */
 #camera-denied {
-  margin-top: 18px;
+  margin-top: 20px;
   text-align: center;
 }
 .denied-text {
   margin-bottom: 12px;
-  font-size: 15px;
-  color: var(--neon-magenta);
-  text-shadow: 0 0 10px rgba(255, 0, 255, 0.7);
+  font-size: 14px;
+  letter-spacing: 1px;
+  color: var(--ink-dim);
 }
 #skip-camera-btn {
   width: 100%;
 }
 
 /* ============================================================
-   主场景相关容器（后续任务直接使用，本任务只负责显隐）
+   主场景相关容器（位置布局保持不变，只把描边换成细金风）
    ============================================================ */
 
-/* 3D 场景容器：铺满全屏的最底层；3D 蛋糕还没做，先是一块全屏黑幕 */
+/* 3D 场景容器：铺满全屏的最底层 */
 #scene-container {
   position: fixed;
   inset: 0;
   z-index: 1;
-  background: var(--bg-black);
+  background: var(--bg-deep);
 }
 
 /* 摄像头预览小窗：右下角。
@@ -331,9 +316,8 @@ html, body {
   z-index: 50;
   width: 160px;
   height: auto;
-  border: 2px solid var(--neon-cyan);
-  border-radius: 12px;
-  box-shadow: 0 0 16px rgba(0, 255, 255, 0.5);
+  border: 1px solid var(--gold-line);
+  border-radius: 10px;
   transform: scaleX(-1);
   background: #000;
 }
@@ -349,13 +333,21 @@ html, body {
 #explode-toggle {
   min-width: 220px;
   min-height: 52px;
-  font-size: 18px;
-  font-weight: 700;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 1px;
   border-radius: 999px;      /* 胶囊形，显得友好 */
-  background: rgba(255, 0, 255, 0.12);
+  color: var(--gold);
+  border: 1px solid var(--gold-line);
+  background: rgba(11, 9, 18, 0.78);  /* 半透明暗底，盖在蛋糕上也能看清字 */
+  backdrop-filter: blur(6px);
+}
+#explode-toggle:hover {
+  border-color: var(--gold);
+  background: rgba(212, 175, 55, 0.12);
 }
 
-/* 音乐播放器占位：固定在左下角（后续任务往里面填内容） */
+/* 音乐播放器占位：固定在左下角（由 music.js 往里面填内容） */
 #music-player {
   position: fixed;
   left: 16px;
@@ -374,12 +366,13 @@ html, body {
 
   .card {
     max-width: 100%;           /* 卡片占满宽度 */
-    padding: 22px 16px;
+    padding: 30px 20px;
     margin-top: 10px;
   }
 
   .title {
-    font-size: 24px;
+    font-size: 30px;
+    letter-spacing: 3px;
   }
 
   /* 按钮全部拉满一行且不低于 44px，拇指随便点都中 */

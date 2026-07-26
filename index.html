@@ -1,11 +1,46 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <!-- viewport：让手机按真实宽度渲染，否则页面会被当成电脑网页缩小，按钮点不准 -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🎂 魔法赛博生日蛋糕</title>
+  <title>Happy Birthday</title>
   <link rel="stylesheet" href="css/style.css">
+  <!-- 手势状态指示灯的样式。指示灯元素由 js/gesture.js 动态创建（#gesture-status），
+       四种状态靠 data-state 切换圆点颜色：
+       open=绿（认出张掌） fist=金（认出握拳） none=灰（没看见手） off=红（摄像头/模型罢工） -->
+  <style>
+    #gesture-status {
+      position: fixed;
+      right: 16px;
+      bottom: 150px; /* 兜底位置；gesture.js 会按预览小窗的实际位置精确贴到它正上方 */
+      z-index: 51;   /* 预览小窗是 50，指示灯要高一层才不会被压住 */
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      background: rgba(0, 0, 0, 0.55); /* 黑底半透明，不挡画面 */
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      border-radius: 999px;            /* 胶囊形 */
+      font-size: 12px;
+      line-height: 1.4;
+      color: #fff;
+      white-space: nowrap;
+      pointer-events: none;            /* 只看不摸：点击穿透，不影响下面元素的操作 */
+      user-select: none;
+    }
+    #gesture-status .gs-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #888;
+      flex-shrink: 0;
+    }
+    #gesture-status[data-state="open"] .gs-dot { background: #2eff8a; box-shadow: 0 0 6px #2eff8a; }
+    #gesture-status[data-state="fist"] .gs-dot { background: #ffd23f; box-shadow: 0 0 6px #ffd23f; }
+    #gesture-status[data-state="none"] .gs-dot { background: #888; }
+    #gesture-status[data-state="off"]  .gs-dot { background: #ff4d4d; box-shadow: 0 0 6px #ff4d4d; }
+  </style>
 </head>
 <body>
 
@@ -15,37 +50,36 @@
        ========================================================== -->
   <div id="intro-screen">
     <div class="card">
-      <h1 class="title">🎂 魔法赛博生日蛋糕</h1>
-      <p class="subtitle">挥挥手就能炸开蛋糕！先告诉我你是谁吧～</p>
+      <h1 class="title">Happy Birthday</h1>
+      <p class="subtitle">A little celebration, made for you.</p>
 
       <!-- 姓名（必填） -->
-      <label class="field-label" for="name-input">你的名字</label>
-      <input id="name-input" class="neon-input" type="text" placeholder="例如：小明" maxlength="20" autocomplete="off">
+      <label class="field-label" for="name-input">Name</label>
+      <input id="name-input" class="neon-input" type="text" placeholder="Your name" maxlength="20" autocomplete="off">
 
       <!-- 年龄（必填）。type="number" 让手机自动弹出数字键盘 -->
-      <label class="field-label" for="age-input">今年几岁啦</label>
-      <input id="age-input" class="neon-input" type="number" placeholder="例如：20" min="1" max="150" inputmode="numeric">
+      <label class="field-label" for="age-input">Age</label>
+      <input id="age-input" class="neon-input" type="number" placeholder="Your age" min="1" max="150" inputmode="numeric">
 
       <!-- 照片上传（可选）。
            原生文件选择框很丑又难改样式，所以把它"藏"起来（.visually-hidden），
            用一个好看的 label 按钮代替它：label 的 for 指向 input 的 id，
            点 label 就等价于点那个隐藏的选择框 -->
-      <label class="field-label">照片（可选，会围着蛋糕转哦）</label>
-      <label class="neon-btn upload-btn" for="photo-input">📷 选择照片</label>
+      <label class="field-label">Photos (optional)</label>
+      <label class="neon-btn upload-btn" for="photo-input">Add photos</label>
       <input id="photo-input" class="visually-hidden" type="file" multiple accept="image/*">
       <!-- 已选照片的缩略图列表（预置照片 + 自己上传的照片） -->
       <div id="photo-list" class="photo-list"></div>
-      <p class="hint">照片只保存在你自己的浏览器里，不会上传到任何服务器～</p>
 
       <!-- 授权前的"预告"：先说清楚要摄像头干嘛，弹窗才不会吓到人 -->
-      <p class="camera-note">我们需要摄像头来识别你的手势魔法 🪄（画面只在你浏览器里处理，不会上传）</p>
+      <p class="camera-note">Camera is used for hand gestures only. Nothing leaves your browser.</p>
 
-      <button id="enter-btn" class="neon-btn enter-btn" type="button">进入魔法世界 ✨</button>
+      <button id="enter-btn" class="neon-btn enter-btn" type="button">Begin</button>
 
       <!-- 摄像头被拒 / 没有摄像头时的 Plan B 入口（默认隐藏） -->
       <div id="camera-denied" class="hidden">
-        <p class="denied-text">没有摄像头也没关系！🎈</p>
-        <button id="skip-camera-btn" class="neon-btn" type="button">跳过手势，直接看蛋糕 🎂</button>
+        <p class="denied-text">No camera? No problem.</p>
+        <button id="skip-camera-btn" class="neon-btn" type="button">Continue without gestures</button>
       </div>
     </div>
   </div>
@@ -62,7 +96,7 @@
 
   <!-- 降级模式按钮区（初始隐藏）：没有摄像头时，用手指点按钮代替挥手 -->
   <div id="gesture-fallback" class="hidden">
-    <button id="explode-toggle" class="neon-btn" type="button">✋ 炸开蛋糕</button>
+    <button id="explode-toggle" class="neon-btn" type="button">✋ Open the cake</button>
   </div>
 
   <!-- 音乐播放器 UI 占位容器（初始隐藏）：后续任务会往这里填播放/切歌按钮 -->

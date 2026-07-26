@@ -72,7 +72,7 @@
       localStorage.setItem(STORAGE_KEY, JSON.stringify(userPhotos));
     } catch (e) {
       // 照片太多超过仓库上限时会走到这里：明着告诉用户，而不是悄悄丢数据
-      alert('照片太多啦，浏览器的小仓库装不下了 😢\n试试删掉几张再传～');
+      alert('Too many photos — your browser\'s local storage is full.\nTry removing a few before adding more.');
     }
   }
 
@@ -101,7 +101,7 @@
 
     var img = document.createElement('img');
     img.src = src;
-    img.alt = isPreset ? '预置照片' : '我上传的照片';
+    img.alt = isPreset ? 'Preset photo' : 'Your photo';
     // 预置图文件不存在（比如文件夹还是空的）时，悄悄把这个格子撤掉，不打扰用户
     img.onerror = function () { item.remove(); };
     item.appendChild(img);
@@ -109,14 +109,14 @@
     if (isPreset) {
       var tag = document.createElement('span');
       tag.className = 'preset-tag';
-      tag.textContent = '预置';
+      tag.textContent = 'Preset';
       item.appendChild(tag);
     } else {
       var delBtn = document.createElement('button');
       delBtn.type = 'button';
       delBtn.className = 'photo-del';
       delBtn.textContent = '×';
-      delBtn.title = '删除这张照片';
+      delBtn.title = 'Remove this photo';
       // 用闭包锁住 index：点哪个叉，就删哪一张
       delBtn.addEventListener('click', function () {
         userPhotos.splice(index, 1);
@@ -227,7 +227,7 @@
 
     // 请求摄像头期间禁用按钮，防止心急连点造成重复弹窗
     enterBtn.disabled = true;
-    enterBtn.textContent = '正在召唤摄像头…';
+    enterBtn.textContent = 'Requesting camera…';
 
     // 老浏览器没有摄像头 API：不算失败，直接给降级入口
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -251,7 +251,7 @@
 
   function restoreEnterBtn() {
     enterBtn.disabled = false;
-    enterBtn.textContent = '进入魔法世界 ✨';
+    enterBtn.textContent = 'Begin';
   }
 
   /* "跳过手势，直接看蛋糕"：没有摄像头也能玩，
@@ -317,7 +317,7 @@
   var exploded = false;
   explodeToggle.addEventListener('click', function () {
     exploded = !exploded;
-    explodeToggle.textContent = exploded ? '✊ 恢复原样' : '✋ 炸开蛋糕';
+    explodeToggle.textContent = exploded ? '✊ Put it back' : '✋ Open the cake';
     // 动画函数同样由后续任务实现：有就调用，没有就留话
     if (typeof window.toggleCakeExplode === 'function') {
       window.toggleCakeExplode(exploded);

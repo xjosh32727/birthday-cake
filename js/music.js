@@ -5,12 +5,12 @@
  *   1. 用 Web Audio API "现场合成"八音盒版《生日快乐》
  *      （不需要任何音频文件，相当于给浏览器装了一个音乐盒机芯）
  *   2. 在左下角画出一个霓虹胶囊播放器：播放/暂停、曲名、选歌列表
- *   3. 探测 audio/ 文件夹里有没有 after17.mp3 / 22.mp3：
+ *   3. 探测 audio/ 文件夹里有没有那三首"卡槽歌"（陈绮贞 flac、王菲 / 陶喆 mp3）：
  *      有 → 解锁可点播；没有 → 置灰 + 一句友好提示
  *
  * 播放器长这样（屏幕左下角的小胶囊，不挡蛋糕）：
  *   ┌────────────────────────────────┐
- *   │  (⏸) 🎵 生日快乐 · 八音盒版 (🎶) │
+ *   │  (⏸) 🎵 Music Box: Happy Birthday (🎶) │
  *   └────────────────────────────────┘
  *   ⏸ = 播放/暂停      🎶 = 打开/收起选歌列表
  *
@@ -81,13 +81,16 @@
   var SPARKLE_STEP = 0.07;                 // 每颗"星星"之间隔 0.07 秒
 
   /* —— 曲目表 ——
-     type='box'：现场合成的八音盒，永远可用；
-     type='mp3'：两首"卡槽歌"，初始化时会探测文件是否存在，
-                 存在才解锁（locked 改成 false），否则保持置灰。 */
+     type='box' ：现场合成的八音盒，永远可用；
+     type='file'：三首"卡槽歌"（mp3 / flac 都走 HTMLAudioElement 这条路），
+                 初始化时会探测文件是否存在，存在才解锁（locked 改成 false），
+                 否则保持置灰。
+     注意：文件名里有中文和空格，真正发请求 / 设置 src 前必须先 encodeURI。 */
   var TRACKS = [
-    { id: 'box',     type: 'box', icon: '🎵', name: '生日快乐 · 八音盒版', locked: false },
-    { id: 'after17', type: 'mp3', icon: '🎧', name: 'After 17 - 陈绮贞', src: 'audio/after17.mp3', file: 'after17.mp3', locked: true },
-    { id: 'song22',  type: 'mp3', icon: '🎧', name: '二十二 - 陶喆',     src: 'audio/22.mp3',      file: '22.mp3',      locked: true }
+    { id: 'box',     type: 'box',  icon: '🎵', name: 'Music Box: Happy Birthday',  locked: false },
+    { id: 'after17', type: 'file', icon: '🎧', name: 'After 17 – Cheer Chen',      src: 'audio/陈绮贞 - After 17.flac', file: '陈绮贞 - After 17.flac', locked: true },
+    { id: 'forgive', type: 'file', icon: '🎧', name: 'Forgive Myself – Faye Wong', src: 'audio/王菲-原谅自己.mp3',      file: '王菲-原谅自己.mp3',      locked: true },
+    { id: 'song22',  type: 'file', icon: '🎧', name: 'Twenty-Two – David Tao',     src: 'audio/陶喆-二十二.mp3',        file: '陶喆-二十二.mp3',        locked: true }
   ];
 
   /* ============================================================
@@ -115,8 +118,8 @@
   var boxPlaying = false;
   var loopTimer = null;
 
-  var audioEl = null;         // 播 mp3 用的播放器（HTMLAudioElement），要用时才创建
-  var playingMp3Id = null;    // 当前装进"卡槽"的是哪首 mp3
+  var audioEl = null;         // 播音频文件用的播放器（HTMLAudioElement），要用时才创建
+  var playingFileId = null;   // 当前装进"卡槽"的是哪一首文件歌
 
   /* ============================================================
      三、样式（用 JS 注入 <style>，不动别人的 css 文件）
@@ -261,7 +264,7 @@
   /* 开始放八音盒（从头播）。返回 false = 这个浏览器合成不了 */
   function startBox() {
     if (!ensureBoxCtx()) {
-      toast('你的浏览器不支持现场合成音乐 😢 可以试试 mp3 卡槽里的歌');
+      toast('This browser cannot run the music box synth 😢 Try one of the unlocked file tracks.');
       return false;
     }
     clearTimeout(loopTimer);
@@ -286,7 +289,7 @@
   }
 
   /* 炸开彩蛋：快速上行的高音琶音，像"哗"地撒出一把星星。
-     注意它直接连 destination，不经过 boxGain —— 就算正在放 mp3，星星也照撒 */
+     注意它直接连 destination，不经过 boxGain —— 就算正在放卡槽歌，星星也照撒 */
   function playSparkle() {
     if (!boxCtx || boxCtx.state !== 'running') return; // 没有出声环境就不撒
     var t0 = boxCtx.currentTime + 0.03;
@@ -310,10 +313,14 @@
   }
 
   /* ============================================================
-     五、mp3 卡槽（HTMLAudioElement 播真实音频文件）
+     五、音频文件卡槽（HTMLAudioElement 播真实音频文件）
+     ------------------------------------------------------------
+     mp3 和 flac 用同一个 <audio> 元素播放：Chrome / Edge / Firefox
+     都原生支持 flac 解码，写法上和 mp3 没有任何区别；
+     个别解不了 flac 的浏览器会在播放时触发 error，在那里统一回锁。
      ============================================================ */
 
-  /* 懒创建 mp3 播放器：只有一个，谁被选中就"插"谁的文件进去 */
+  /* 懒创建文件播放器：只有一个，谁被选中就"插"谁的文件进去 */
   function ensureAudioEl() {
     if (audioEl) return audioEl;
     if (typeof Audio !== 'function') return null; // 老到没有 Audio 的浏览器：静默放弃
@@ -321,16 +328,23 @@
       audioEl = new Audio();
       audioEl.loop = true;      // 卡槽的歌单曲循环，派对气氛不断电
       audioEl.preload = 'auto';
-      /* 文件损坏 / 格式不支持时会触发 error：
-         把这歌重新锁上并提示，别让它反复报错 */
+      /* 文件损坏 / 格式不支持（比如这个浏览器解不了 flac）时会触发 error：
+         把出错的那首歌重新锁上并提示，别让它反复报错。
+         注意用 playingFileId 找"真正出错的那首"，而不是当前选中的歌。 */
       audioEl.addEventListener('error', function () {
-        var t = getCurrentTrack();
-        if (t.type !== 'mp3') return;
-        t.locked = true;
-        state.playing = false;
-        toast('这首歌好像读不出来 😢 检查一下 ' + t.file + ' 是不是完整的 mp3');
+        var t = findTrack(playingFileId);
+        if (!t || t.type !== 'file') return;
+        t.locked = true; // 自动回锁：探测到文件存在 ≠ 这个浏览器播得出
+        if (t.id === state.currentTrackId) {
+          state.playing = false;
+          updateHeader();
+        }
+        if (/\.flac$/i.test(t.file)) {
+          toast("This browser can't play FLAC. Try Chrome.");
+        } else {
+          toast('"' + t.file + '" could not be played. Check that the file is complete.');
+        }
         renderList();
-        updateHeader();
       });
       return audioEl;
     } catch (e) {
@@ -339,13 +353,15 @@
     }
   }
 
-  function playMp3(track) {
+  function playFile(track) {
     var el = ensureAudioEl();
-    if (!el) { toast('你的浏览器播不了 mp3 😢'); return false; }
+    if (!el) { toast('This browser cannot play audio files 😢'); return false; }
     stopBox(); // 插卡前先把音乐盒的发条松掉，两种声音不打架
-    if (playingMp3Id !== track.id) {
-      el.src = track.src;       // 换歌 = 换一张"卡带"
-      playingMp3Id = track.id;
+    if (playingFileId !== track.id) {
+      /* 文件名含中文和空格，先 encodeURI 再交给 <audio>，
+         否则部分浏览器会因为路径里的汉字 / 空格直接 404 */
+      el.src = encodeURI(track.src); // 换歌 = 换一张"卡带"
+      playingFileId = track.id;
     }
     var p = el.play();
     /* play() 返回 Promise：个别浏览器会拦自动播放，兜住并给用户一个可操作的提示 */
@@ -353,35 +369,40 @@
       p.catch(function () {
         state.playing = false;
         updateHeader();
-        toast('浏览器拦了一下自动播放，再点一次播放键试试 👆');
+        toast('Autoplay was blocked by the browser. Tap the play button once more 👆');
       });
     }
     return true;
   }
 
-  function pauseMp3() {
+  function pauseFile() {
     if (audioEl) audioEl.pause();
   }
 
   /* ============================================================
-     六、切歌总调度（八音盒和 mp3 之间的"红绿灯"）
+     六、切歌总调度（八音盒和文件歌之间的"红绿灯"）
      ============================================================ */
 
-  function getCurrentTrack() {
+  /* 按 id 找曲目；找不到返回 null */
+  function findTrack(id) {
     for (var i = 0; i < TRACKS.length; i++) {
-      if (TRACKS[i].id === state.currentTrackId) return TRACKS[i];
+      if (TRACKS[i].id === id) return TRACKS[i];
     }
-    return TRACKS[0];
+    return null;
+  }
+
+  function getCurrentTrack() {
+    return findTrack(state.currentTrackId) || TRACKS[0];
   }
 
   /* 开播指定曲目；返回是否真的响起来了 */
   function startTrack(track) {
     var ok;
     if (track.type === 'box') {
-      pauseMp3();
+      pauseFile();
       ok = startBox();
     } else {
-      ok = playMp3(track); // playMp3 内部会 stopBox()
+      ok = playFile(track); // playFile 内部会 stopBox()
     }
     state.playing = ok;
     updateHeader();
@@ -392,7 +413,7 @@
   function onTogglePlay() {
     var track = getCurrentTrack();
     if (state.playing) {
-      if (track.type === 'box') stopBox(); else pauseMp3();
+      if (track.type === 'box') stopBox(); else pauseFile();
       state.playing = false;
       updateHeader();
     } else {
@@ -404,7 +425,8 @@
   function onSelectTrack(track) {
     closeList(); // 选完（或看完提示）就把列表收起来，也避免提示气泡和列表叠在一起
     if (track.locked) {
-      toast('把 ' + track.file + ' 放进 audio 文件夹就能解锁这首歌 🎁');
+      /* 提示里带上具体的文件名，用户才知道该把哪个文件拖进 audio 文件夹 */
+      toast('Place "' + track.file + '" in the audio folder to unlock 🎵');
       return;
     }
     if (track.id === state.currentTrackId) {
@@ -413,17 +435,19 @@
     }
     /* 换歌：先停旧的，再播新的 */
     stopBox();
-    pauseMp3();
+    pauseFile();
     state.currentTrackId = track.id;
     startTrack(track);
     renderList(); // 刷新列表里的"正在播放"高亮
   }
 
   /* ============================================================
-     七、卡槽探测：看看 audio/ 里到底有没有那两首 mp3
+     七、卡槽探测：看看 audio/ 里到底有没有那三首音频文件
      ------------------------------------------------------------
      做法是发一个 HEAD 请求"敲门"：门开了（2xx）= 文件存在，解锁；
      404 / 网络异常 / file:// 协议下 fetch 直接失败 → 都当作"不存在"，静默容错。
+     文件名里有中文和空格，探测前必须 encodeURI（比如 'audio/陈绮贞 - After 17.flac'
+     会变成 'audio/%E9%99%88%E7%BB%AE%E8%B4%9E%20-%20After%2017.flac' 再发出去）。
      ============================================================ */
   function probeFile(url, onDone) {
     if (typeof window.fetch !== 'function') { onDone(false); return; }
@@ -439,8 +463,8 @@
 
   function detectSlots() {
     TRACKS.forEach(function (track) {
-      if (track.type !== 'mp3') return;
-      probeFile(track.src, function (exists) {
+      if (track.type !== 'file') return;
+      probeFile(encodeURI(track.src), function (exists) {
         track.locked = !exists;
         renderList(); // 探测结果一回来就刷新列表的锁/解锁状态
       });
@@ -470,7 +494,7 @@
     var track = getCurrentTrack();
     nameEl.textContent = track.icon + ' ' + track.name;
     playBtn.textContent = state.playing ? '⏸' : '▶';
-    playBtn.title = state.playing ? '暂停' : '播放';
+    playBtn.title = state.playing ? 'Pause' : 'Play';
   }
 
   /* 重画选歌列表：锁着的置灰带 🔒，正在播的描边变品红 */
@@ -484,7 +508,7 @@
       if (track.locked) item.className += ' mp-locked';
       if (track.id === state.currentTrackId) item.className += ' mp-active';
       item.textContent = (track.locked ? '🔒 ' : track.icon + ' ') + track.name;
-      item.title = track.locked ? ('文件还没放进 audio 文件夹') : ('播放：' + track.name);
+      item.title = track.locked ? ('File not found in the audio folder yet') : ('Play: ' + track.name);
       /* 闭包锁住 track：点哪一行，就处理哪一首 */
       item.addEventListener('click', function () { onSelectTrack(track); });
       listEl.appendChild(item);
@@ -509,7 +533,7 @@
     playBtn.type = 'button';
     playBtn.className = 'mp-btn';
     playBtn.textContent = '▶';
-    playBtn.title = '播放';
+    playBtn.title = 'Play';
     playBtn.addEventListener('click', onTogglePlay);
 
     nameEl = document.createElement('span');
@@ -519,7 +543,7 @@
     listBtn.type = 'button';
     listBtn.className = 'mp-btn';
     listBtn.textContent = '🎶';
-    listBtn.title = '选歌';
+    listBtn.title = 'Choose a track';
     listBtn.addEventListener('click', function () {
       listEl.classList.toggle('mp-open');
     });
