@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <!-- viewport：让手机按真实宽度渲染，否则页面会被当成电脑网页缩小，按钮点不准 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🎂 魔法赛博生日蛋糕</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ==========================================================
+       开场录入页：全屏覆盖层，打开网页第一眼看到的就是它。
+       校验通过 + 摄像头流程走完后，它会被隐藏，露出下面的 3D 场景。
+       ========================================================== -->
+  <div id="intro-screen">
+    <div class="card">
+      <h1 class="title">🎂 魔法赛博生日蛋糕</h1>
+      <p class="subtitle">挥挥手就能炸开蛋糕！先告诉我你是谁吧～</p>
+
+      <!-- 姓名（必填） -->
+      <label class="field-label" for="name-input">你的名字</label>
+      <input id="name-input" class="neon-input" type="text" placeholder="例如：小明" maxlength="20" autocomplete="off">
+
+      <!-- 年龄（必填）。type="number" 让手机自动弹出数字键盘 -->
+      <label class="field-label" for="age-input">今年几岁啦</label>
+      <input id="age-input" class="neon-input" type="number" placeholder="例如：20" min="1" max="150" inputmode="numeric">
+
+      <!-- 照片上传（可选）。
+           原生文件选择框很丑又难改样式，所以把它"藏"起来（.visually-hidden），
+           用一个好看的 label 按钮代替它：label 的 for 指向 input 的 id，
+           点 label 就等价于点那个隐藏的选择框 -->
+      <label class="field-label">照片（可选，会围着蛋糕转哦）</label>
+      <label class="neon-btn upload-btn" for="photo-input">📷 选择照片</label>
+      <input id="photo-input" class="visually-hidden" type="file" multiple accept="image/*">
+      <!-- 已选照片的缩略图列表（预置照片 + 自己上传的照片） -->
+      <div id="photo-list" class="photo-list"></div>
+      <p class="hint">照片只保存在你自己的浏览器里，不会上传到任何服务器～</p>
+
+      <!-- 授权前的"预告"：先说清楚要摄像头干嘛，弹窗才不会吓到人 -->
+      <p class="camera-note">我们需要摄像头来识别你的手势魔法 🪄（画面只在你浏览器里处理，不会上传）</p>
+
+      <button id="enter-btn" class="neon-btn enter-btn" type="button">进入魔法世界 ✨</button>
+
+      <!-- 摄像头被拒 / 没有摄像头时的 Plan B 入口（默认隐藏） -->
+      <div id="camera-denied" class="hidden">
+        <p class="denied-text">没有摄像头也没关系！🎈</p>
+        <button id="skip-camera-btn" class="neon-btn" type="button">跳过手势，直接看蛋糕 🎂</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================================
+       3D 蛋糕场景容器（初始隐藏）
+       后续任务会把 Three.js 的画布挂进这个 div；现在它是一块全屏黑幕
+       ========================================================== -->
+  <div id="scene-container" class="hidden"></div>
+
+  <!-- 右下角摄像头预览小窗（初始隐藏）。
+       autoplay + playsinline + muted 是手机浏览器允许自动播放的"通行证" -->
+  <video id="cam-preview" class="hidden" autoplay playsinline muted></video>
+
+  <!-- 降级模式按钮区（初始隐藏）：没有摄像头时，用手指点按钮代替挥手 -->
+  <div id="gesture-fallback" class="hidden">
+    <button id="explode-toggle" class="neon-btn" type="button">✋ 炸开蛋糕</button>
+  </div>
+
+  <!-- 音乐播放器 UI 占位容器（初始隐藏）：后续任务会往这里填播放/切歌按钮 -->
+  <div id="music-player" class="hidden"></div>
+
+  <!-- ==========================================================
+       第三方库 + 自己的脚本
+       全部用 CDN 的"全局脚本版"（不是 ES module），
+       这样双击 html（file:// 协议）和 GitHub Pages 都能直接跑。
+       引入顺序固定不能乱：先三个库，再我们自己的 form.js。
+       ========================================================== -->
+  <!-- Three.js：3D 引擎，暴露全局变量 THREE（后续任务画蛋糕用） -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- MediaPipe Hands：手势识别，暴露全局变量 Hands（后续任务用） -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+  <!-- MediaPipe Camera Utils：摄像头逐帧读取工具，暴露全局变量 Camera -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <script src="js/scene.js"></script>
+  <script src="js/gesture.js"></script>
+  <script src="js/music.js"></script>
+  <!-- 录入页逻辑（本项目自己的代码） -->
+  <script src="js/form.js"></script>
+</body>
+</html>

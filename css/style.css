@@ -1,0 +1,408 @@
+/* ============================================================
+   魔法赛博生日蛋糕 · 全局样式
+   设计基调：纯黑宇宙 + 青/品红/紫 三色霓虹辉光（赛博朋克）
+   颜色集中在 :root 变量里，想换主题色只改这几行就行
+   ============================================================ */
+
+:root {
+  --neon-cyan: #0ff;      /* 青：主色调（边框、输入框、主按钮） */
+  --neon-magenta: #f0f;   /* 品红：强调色（标题光晕、次按钮） */
+  --neon-purple: #9d4edd; /* 紫：辅助色（说明文字、"预置"标签） */
+  --bg-black: #000;       /* 全局纯黑背景 */
+  --danger: #ff3355;      /* 校验失败的红色 */
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  background: var(--bg-black);
+  color: #fff;
+  /* 系统字体栈：不加载网络字体，断网双击打开也能秒开 */
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+               "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* 通用隐藏类：JS 靠加/删它来控制元素显隐 */
+.hidden {
+  display: none !important;
+}
+
+/* ============================================================
+   录入页（全屏覆盖层）
+   ============================================================ */
+
+#intro-screen {
+  position: fixed;
+  inset: 0;                  /* 等价于上下左右全是 0：铺满整个屏幕 */
+  z-index: 100;              /* 盖在 3D 场景之上 */
+  overflow-y: auto;          /* 手机屏矮时允许滚动，内容不会被截断 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  /* 氛围是三层背景叠出来的：两团霓虹光晕 + 淡淡青色网格线 + 纯黑底，
+     全部是 CSS 画的，不需要任何图片素材 */
+  background:
+    radial-gradient(ellipse 60% 40% at 20% 10%, rgba(255, 0, 255, 0.10), transparent 70%),
+    radial-gradient(ellipse 60% 40% at 80% 90%, rgba(0, 255, 255, 0.08), transparent 70%),
+    repeating-linear-gradient(0deg, rgba(0, 255, 255, 0.04) 0 1px, transparent 1px 44px),
+    repeating-linear-gradient(90deg, rgba(0, 255, 255, 0.04) 0 1px, transparent 1px 44px),
+    var(--bg-black);
+}
+
+/* 居中卡片：半透明深色底 + 青色描边 + 毛玻璃，浮在黑底上的"玻璃卡片" */
+.card {
+  width: 100%;
+  max-width: 460px;
+  padding: 30px 26px;
+  border: 1px solid rgba(0, 255, 255, 0.45);
+  border-radius: 18px;
+  background: rgba(12, 12, 24, 0.78);
+  box-shadow:
+    0 0 30px rgba(0, 255, 255, 0.18),
+    0 0 70px rgba(255, 0, 255, 0.10);
+  backdrop-filter: blur(8px);  /* 毛玻璃；老浏览器会自动忽略这条，不影响功能 */
+}
+
+/* 霓虹标题：多层 text-shadow 叠出"光晕由近到远扩散"的灯管感 */
+.title {
+  text-align: center;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: #fff;
+  text-shadow:
+    0 0 6px #fff,
+    0 0 14px var(--neon-cyan),
+    0 0 32px var(--neon-cyan),
+    0 0 60px var(--neon-magenta);
+  animation: title-breathe 3s ease-in-out infinite;
+}
+
+/* 标题"呼吸"动画：光晕轻微强弱变化，像真的霓虹灯管在闪 */
+@keyframes title-breathe {
+  0%, 100% { text-shadow: 0 0 6px #fff, 0 0 14px var(--neon-cyan), 0 0 32px var(--neon-cyan), 0 0 60px var(--neon-magenta); }
+  50%      { text-shadow: 0 0 4px #fff, 0 0 10px var(--neon-cyan), 0 0 22px var(--neon-cyan), 0 0 42px var(--neon-magenta); }
+}
+
+.subtitle {
+  margin-top: 10px;
+  text-align: center;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* 每个输入框上方的小标签 */
+.field-label {
+  display: block;
+  margin: 20px 0 8px;
+  font-size: 14px;
+  color: var(--neon-cyan);
+  text-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
+}
+
+/* 霓虹输入框：暗底 + 青边，聚焦时青色发光 */
+.neon-input {
+  width: 100%;
+  min-height: 44px;      /* 44px：手机端"手指好按"的最小高度标准 */
+  padding: 10px 14px;
+  font-size: 16px;       /* iOS 上字号 <16px 聚焦时会自动放大页面，16px 可避免 */
+  color: #fff;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(0, 255, 255, 0.45);
+  border-radius: 10px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.neon-input::placeholder {
+  color: rgba(0, 255, 255, 0.3);
+}
+
+.neon-input:focus {
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 16px rgba(0, 255, 255, 0.55);
+}
+
+/* 校验失败状态：红色发光边框（.input-error 由 JS 添加，改对后 JS 会移除） */
+.neon-input.input-error {
+  border-color: var(--danger);
+  box-shadow: 0 0 16px rgba(255, 51, 85, 0.8);
+}
+
+/* 抖动动画：左右快速晃，像老师在摇手说"这里还没填哦"（播完 JS 会移除 .shake） */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  40% { transform: translateX(8px); }
+  60% { transform: translateX(-6px); }
+  80% { transform: translateX(6px); }
+}
+.shake {
+  animation: shake 0.4s ease;
+}
+
+/* 霓虹按钮通用样式：透明底 + 发光描边，hover 时被"点亮" */
+.neon-btn {
+  display: inline-block;
+  min-height: 44px;
+  padding: 10px 22px;
+  font-size: 16px;
+  color: var(--neon-magenta);
+  background: transparent;
+  border: 2px solid var(--neon-magenta);
+  border-radius: 10px;
+  cursor: pointer;
+  text-shadow: 0 0 8px rgba(255, 0, 255, 0.7);
+  box-shadow: 0 0 10px rgba(255, 0, 255, 0.25), inset 0 0 10px rgba(255, 0, 255, 0.10);
+  transition: box-shadow 0.2s, background 0.2s, transform 0.1s;
+}
+
+.neon-btn:hover {
+  background: rgba(255, 0, 255, 0.12);
+  box-shadow: 0 0 24px rgba(255, 0, 255, 0.7), inset 0 0 14px rgba(255, 0, 255, 0.2);
+}
+
+.neon-btn:active {
+  transform: scale(0.97);  /* 按下轻微缩小，有"按下去"的手感 */
+}
+
+/* 上传照片按钮：虚线框表示"这里还能放东西" */
+.upload-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  color: var(--neon-cyan);
+  border-style: dashed;
+  border-color: rgba(0, 255, 255, 0.6);
+  text-shadow: 0 0 8px rgba(0, 255, 255, 0.6);
+  box-shadow: none;
+}
+.upload-btn:hover {
+  background: rgba(0, 255, 255, 0.08);
+  box-shadow: 0 0 16px rgba(0, 255, 255, 0.45);
+}
+
+/* 把原生文件选择框"藏"起来，但保留功能（label 的 for 还能触发它） */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+}
+
+/* 照片缩略图列表：格子布局，容器宽就多放几列、窄就少放，天然响应式 */
+.photo-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.photo-item {
+  position: relative;        /* 让删除按钮和"预置"标签能贴着角落定位 */
+  aspect-ratio: 1 / 1;       /* 正方形缩略图，排起来整齐 */
+  border: 1px solid rgba(0, 255, 255, 0.35);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 0 8px rgba(0, 255, 255, 0.2);
+}
+
+.photo-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;         /* 裁掉多余部分但不变形，缩略图标准做法 */
+  display: block;
+}
+
+/* 删除小叉：右上角圆形小按钮，只有自己上传的照片才有 */
+.photo-del {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.75);
+  color: var(--danger);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  transition: box-shadow 0.2s, color 0.2s;
+}
+.photo-del:hover {
+  color: #fff;
+  box-shadow: 0 0 10px var(--danger);
+}
+
+/* "预置"标签：左下角小角标，告诉用户这张是自带的、不能删 */
+.preset-tag {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  padding: 2px 8px;
+  font-size: 11px;
+  color: #fff;
+  background: rgba(157, 78, 221, 0.85);
+  border-top-right-radius: 8px;
+}
+
+.hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: rgba(0, 255, 255, 0.45);
+}
+
+/* 摄像头用途说明：授权前先讲清楚，用户才放心点"允许" */
+.camera-note {
+  margin-top: 22px;
+  font-size: 13px;
+  line-height: 1.7;
+  text-align: center;
+  color: var(--neon-purple);
+  text-shadow: 0 0 8px rgba(157, 78, 221, 0.5);
+}
+
+/* 主按钮：整行宽、青色霓虹，和次按钮拉开层级，一眼看到该点哪 */
+.enter-btn {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--neon-cyan);
+  border-color: var(--neon-cyan);
+  text-shadow: 0 0 8px rgba(0, 255, 255, 0.8);
+  box-shadow: 0 0 14px rgba(0, 255, 255, 0.3), inset 0 0 12px rgba(0, 255, 255, 0.12);
+}
+.enter-btn:hover {
+  background: rgba(0, 255, 255, 0.10);
+  box-shadow: 0 0 28px rgba(0, 255, 255, 0.75), inset 0 0 16px rgba(0, 255, 255, 0.2);
+}
+.enter-btn:disabled {
+  opacity: 0.55;
+  cursor: wait;              /* 正在请求摄像头权限时变成等待光标 */
+}
+
+/* 摄像头被拒后的降级入口区 */
+#camera-denied {
+  margin-top: 18px;
+  text-align: center;
+}
+.denied-text {
+  margin-bottom: 12px;
+  font-size: 15px;
+  color: var(--neon-magenta);
+  text-shadow: 0 0 10px rgba(255, 0, 255, 0.7);
+}
+#skip-camera-btn {
+  width: 100%;
+}
+
+/* ============================================================
+   主场景相关容器（后续任务直接使用，本任务只负责显隐）
+   ============================================================ */
+
+/* 3D 场景容器：铺满全屏的最底层；3D 蛋糕还没做，先是一块全屏黑幕 */
+#scene-container {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  background: var(--bg-black);
+}
+
+/* 摄像头预览小窗：右下角。
+   transform: scaleX(-1) = 镜像翻转，像照镜子一样，挥左手画面里也在左边 */
+#cam-preview {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 50;
+  width: 160px;
+  height: auto;
+  border: 2px solid var(--neon-cyan);
+  border-radius: 12px;
+  box-shadow: 0 0 16px rgba(0, 255, 255, 0.5);
+  transform: scaleX(-1);
+  background: #000;
+}
+
+/* 降级模式按钮区：底部居中的大按钮，手机拇指也好按 */
+#gesture-fallback {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+  z-index: 50;
+}
+#explode-toggle {
+  min-width: 220px;
+  min-height: 52px;
+  font-size: 18px;
+  font-weight: 700;
+  border-radius: 999px;      /* 胶囊形，显得友好 */
+  background: rgba(255, 0, 255, 0.12);
+}
+
+/* 音乐播放器占位：固定在左下角（后续任务往里面填内容） */
+#music-player {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 50;
+}
+
+/* ============================================================
+   手机端适配（屏幕宽度 ≤ 600px）
+   ============================================================ */
+@media (max-width: 600px) {
+  #intro-screen {
+    padding: 14px 12px;
+    align-items: flex-start;   /* 顶部对齐，避免键盘弹出时标题被挤出屏幕 */
+  }
+
+  .card {
+    max-width: 100%;           /* 卡片占满宽度 */
+    padding: 22px 16px;
+    margin-top: 10px;
+  }
+
+  .title {
+    font-size: 24px;
+  }
+
+  /* 按钮全部拉满一行且不低于 44px，拇指随便点都中 */
+  .neon-btn {
+    width: 100%;
+  }
+
+  .enter-btn {
+    min-height: 52px;
+  }
+
+  #cam-preview {
+    width: 110px;              /* 小屏预览窗缩小，别挡蛋糕 */
+    right: 10px;
+    bottom: 10px;
+  }
+
+  #gesture-fallback {
+    bottom: 18px;
+    width: calc(100% - 40px);
+  }
+  #explode-toggle {
+    min-width: 0;
+    width: 100%;
+  }
+}
