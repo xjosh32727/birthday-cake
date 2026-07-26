@@ -3,13 +3,14 @@
  * ------------------------------------------------------------
  * 这个文件负责五件事：
  *   1. 搭舞台：纯黑背景 + 满天星星（像把房间灯关掉，只留蛋糕上的烛光）
- *   2. 堆蛋糕：数百个晶莹发光的小圆球（像玻璃珠/珍珠）堆成 5 层圆丘蛋糕，
- *      球与球之间留一点缝隙，能透出后面的星光
- *   3. 立招牌：蛋糕上方从下到上依次是 —— 发光岁数数字、蜡烛+跳动火焰、
- *      寿星名字、金色衬线字 "Happy Birthday"（全都永远面向你）
+ *   2. 堆蛋糕：数百颗"亮晶晶"的小球（瓷珠 + 通透玻璃珠，带环境反射高光）
+ *      堆成 5 层圆丘蛋糕，大大小小错落分布，还会像泡泡一样缓缓漂移
+ *   3. 立招牌：蛋糕上方从下到上依次是 —— 发光岁数数字、蜡烛+泪滴形火焰
+ *      （根部钉在烛芯上、中上部随风轻摆）、寿星名字、金色衬线字
+ *      "Happy Birthday"（全都永远面向你）
  *   4. 放照片：照片做成"拍立得"（白边+照片），点缀在球丘四周
- *   5. 炸开魔法：window.toggleCakeExplode() —— 小球像泡泡海洋一样
- *      炸满整个画面，照片飞到你面前放大展示；再触发一次就平滑飞回去
+ *   5. 炸开魔法：window.toggleCakeExplode() —— 小球像漫天泡泡海洋一样
+ *      炸满整个画面并缓缓游动，照片飞到你面前放大展示；再触发一次就飞回去
  *
  * 对外只暴露两个函数（form.js 和 gesture.js 会调用，契约不可改）：
  *   - window.startCakeScene({name, age, photos, cameraStream})
@@ -47,10 +48,13 @@
     { radius: 1.25, y: 3.20, count: 26 }
   ];                                        // 桌面端总计约 320 个球（手机端约 145 个）
 
-  var BALL_R_MIN = 0.12;  // 最小球半径（改大→没有"小碎钻"的层次感）
-  var BALL_R_MAX = 0.35;  // 最大球半径（改大→球丘更臃肿，小心互相穿插）
-  var GLASS_RATIO = 0.22; // "玻璃珠"占比：0.22 = 大约每 5 个球里有 1 个半透明
-  var BALL_EMISSIVE = 0.28; // 小球自发光强度：0=不发光 1=亮瞎眼，0.28 是"微微透光"的甜点区
+  /* 球的实际半径由 pickBallRadius() 分段随机（0.08~0.42，大大小小像泡泡）。
+     这里的 BALL_R_MAX 只用来估算"蛋糕占地多宽 / 顶部多高"（给相机和蜡烛定位），
+     务必 ≥ 实际最大半径 0.42，否则相机会算得太近、蜡烛会插进球里 */
+  var BALL_R_MAX = 0.42;
+  var GLASS_RATIO = 0.25;   // "玻璃珠"占比：0.25 = 大约每 4 个球里有 1 个半透明
+  var PEARL_EMISSIVE = 0.16; // 瓷珠自发光：故意压低，靠高光反射取胜，才没有"廉价荧光塑料感"
+  var GLASS_EMISSIVE = 0.15; // 玻璃珠自发光：以通透为主，微微发光即可（0=全黑 1=亮瞎眼）
 
   var STAR_COUNT = 700;   // 星星数量（手机端减半）。想更梦幻改成 1200 试试
   var CENTER_Y = 3.6;     // 蛋糕的"心脏"高度：相机盯着它看，小球从它往外炸
@@ -61,10 +65,11 @@
   var PHOTO_MAX = 10;           // 最多上墙的照片数（太多了会挡蛋糕）
   var PHOTO_EXPLODE_SCALE = 2.3; // 炸开后照片放大的基准倍数（2~2.5 之间最好看）
 
-  /* 炸开后小球的散布范围：以蛋糕中心为球心的大球壳，半径约为蛋糕的 3~6 倍，
-     这样前后左右都飞满，屏幕上才是"球海"而不是"球雾" */
-  var EXPLODE_R_MIN = 13; // 飞得最近的球离中心多远
-  var EXPLODE_R_MAX = 24; // 飞得最远的球（别超过相机远裁剪面 300，放心）
+  /* 炸开后小球的散布范围：以蛋糕中心为球心的大球壳。
+     另外还有约 45% 的球会落在更近的"近景带"(8~16)，专门萦绕在
+     飞到相机前的照片簇四周 —— 照片被泡泡簇拥着，不会空荡 */
+  var EXPLODE_R_MIN = 13; // 远景带：飞得最近的球离中心多远
+  var EXPLODE_R_MAX = 24; // 远景带：飞得最远的球（别超过相机远裁剪面 300，放心）
 
   /* ============================================================
     二、内部状态（只初始化一次的"单例"零件）
@@ -78,10 +83,10 @@
   var camHeight = 4.3;        // 相机高度
 
   /* 蜡烛火焰相关的零件（每帧摇曳动画要用） */
-  var flameGroup = null;      // 火焰整体（内焰+外焰+光晕+点光源都挂它身上）
+  var flameGroup = null;      // 火焰整体（蓝根+内焰+中焰+光晕+点光源都挂它身上）
   var flameLight = null;      // 火焰的暖色点光源
   var flameGlow = null;       // 火焰光晕贴片
-  var flameBaseY = 0;         // 火焰静止时的高度（摇曳是在此基础上偏移）
+  var flameBaseY = 0;         // 火焰根部的高度 = 烛芯顶端，火焰组原点永远钉在这里
   var flameFlicker = 0.85;    // 火焰"心情值"：0.7~1.0 之间随机游走，驱动缩放和亮度
 
   /* 炸开状态机需要的变量 */
@@ -270,6 +275,46 @@
     scene.add(new THREE.Points(geo, mat));
   }
 
+  /* 程序化环境贴图：用 canvas 画一张"假房间全景"（上亮下暗 + 几团亮斑
+     模拟窗户/射灯）。球面会反射这张图，立刻获得真实的高光亮点 ——
+     就像玻璃珠能照出房间的样子。只生成一次，所有球共用，几乎零成本 */
+  function makeEnvTexture() {
+    var canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 256;
+    var ctx = canvas.getContext('2d');
+
+    /* 竖向渐变：天花板暖白 → 中间紫灰 → 地面近黑 */
+    var grad = ctx.createLinearGradient(0, 0, 0, 256);
+    grad.addColorStop(0, '#fff2cf');
+    grad.addColorStop(0.5, '#6a5a7a');
+    grad.addColorStop(1, '#0c0c14');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 512, 256);
+
+    /* 亮斑 = 假的光源（窗户、射灯），球面反射它们就有"高光点"。
+       想高光更多：照着这个格式 [x, y, 半径, 颜色] 多画几团 */
+    var blobs = [
+      [90, 60, 50, 'rgba(255, 236, 190, 0.95)'],
+      [230, 42, 34, 'rgba(255, 255, 255, 0.9)'],
+      [360, 74, 56, 'rgba(255, 205, 150, 0.9)'],
+      [465, 46, 30, 'rgba(190, 215, 255, 0.85)']
+    ];
+    blobs.forEach(function (b) {
+      var g = ctx.createRadialGradient(b[0], b[1], 0, b[0], b[1], b[2]);
+      g.addColorStop(0, b[3]);
+      g.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(b[0], b[1], b[2], 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    var tex = new THREE.CanvasTexture(canvas);
+    tex.mapping = THREE.EquirectangularReflectionMapping; // 告诉 three"这是一张全景反射图"
+    return tex;
+  }
+
   /* 珍珠球蛋糕：几百个小圆球堆成 5 层圆丘 */
   function buildBallCake(scaleFactor) {
     /* 几何体和材质尽量"共用"：300 多个球共用 1 个球体模型 + 十几种材质，
@@ -277,27 +322,40 @@
      注意：模型半径做成 1，每个球用自己的缩放当半径，灵活又省钱 */
     var ballGeo = new THREE.SphereGeometry(1, 18, 14);
 
-    /* 两套材质：
-       ① 珍珠款：不透明、高光强（shininess 高 = 表面像瓷器一样有一个亮亮的光斑）
-       ② 玻璃珠款：半透明（opacity 0.75~0.9），混在里面像掺了几颗水果硬糖 */
+    /* 环境贴图只生成一次。注意：r128 里 Phong 材质只认"材质自己身上的 envMap"
+       （scene.environment 对 Phong 不生效），所以逐个材质挂上；
+       scene.environment 顺手设一份兜底，没有 Phong 之外的光照材质也无害 */
+    var envMap = makeEnvTexture();
+    scene.environment = envMap;
+
+    /* 两套材质（共用同一张环境贴图）：
+       ① 瓷珠/珍珠款(约75%)：不透明 + 锐利白色高光(shininess 高 = 光斑小而亮)，
+          自发光压低到 0.16 —— 靠反射高光取胜而不是自发光，避免"廉价荧光感"
+       ② 玻璃珠款(约25%)：半透明(0.60~0.75) + depthWrite 关闭（防止透明球
+          互相排序错乱、出现奇怪的硬边）+ envMapIntensity 拉高，通透得像水果硬糖 */
     var pearlMats = PEARL_COLORS.map(function (c) {
       return new THREE.MeshPhongMaterial({
         color: c,
-        emissive: c,                  // 自发光：球在黑暗里自己微微发亮
-        emissiveIntensity: BALL_EMISSIVE,
-        shininess: 90,                // 想高光更锐利就调到 100，更哑光就降到 60
-        specular: 0xeeeeee            // 高光颜色接近白，才有"玻璃反光"感
+        emissive: c,
+        emissiveIntensity: PEARL_EMISSIVE,
+        shininess: 100,               // 想高光更锐利保持 100，更哑光降到 60
+        specular: 0xffffff,           // 纯白色高光，才有"玻璃反光"感
+        envMap: envMap,
+        envMapIntensity: 1.0          // 想反射更强调到 1.2，更弱降到 0.8
       });
     });
     var glassMats = PEARL_COLORS.map(function (c) {
       return new THREE.MeshPhongMaterial({
         color: c,
         emissive: c,
-        emissiveIntensity: BALL_EMISSIVE,
+        emissiveIntensity: GLASS_EMISSIVE,
         shininess: 100,
         specular: 0xffffff,
         transparent: true,
-        opacity: 0.75 + Math.random() * 0.15 // 每个玻璃珠透明度都不一样，更自然
+        opacity: 0.6 + Math.random() * 0.15, // 0.60~0.75，每颗略不同更自然
+        depthWrite: false,
+        envMap: envMap,
+        envMapIntensity: 1.35         // 玻璃反射更亮，才有"亮晶晶"的剔透感
       });
     });
 
@@ -314,7 +372,7 @@
         var dome = (1 - rr / def.radius) * 0.35;
         var y = def.y + dome + (Math.random() - 0.5) * 0.22; // 抖动：避免军训队列般的死板
 
-        var ballR = BALL_R_MIN + Math.random() * (BALL_R_MAX - BALL_R_MIN);
+        var ballR = pickBallRadius();
         /* 一小部分球用半透明玻璃材质，其余用珍珠材质 */
         var mat = Math.random() < GLASS_RATIO
           ? glassMats[Math.floor(Math.random() * glassMats.length)]
@@ -327,10 +385,30 @@
 
         var item = makeFloatItem(ball, false);
         item.baseScale = ballR; // 小球的"原始缩放"就是它的半径，动画缩放要乘在它上面
-        item.bobAmp = 0.025 + Math.random() * 0.03; // 球的呼吸极轻微，像水母轻轻 pulsation
+        item.bobAmp = 0.025 + Math.random() * 0.03; // 球的呼吸极轻微，像水母轻轻一张一合
+
+        /* 梦幻漂移参数：随机方向的单位向量 + 独立振幅/频率/相位。
+           每帧位置 = 补间位置 + driftDir × sin(时间×频率 + 相位) × 振幅，
+           蛋糕形态和炸开形态都生效 —— 球海就像泡泡一样缓缓游动 */
+        item.driftDir.set(Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1);
+        if (item.driftDir.lengthSq() < 0.0001) item.driftDir.set(0, 1, 0); // 防倒霉的零向量
+        item.driftDir.normalize();
+        item.driftAmp = 0.1 + Math.random() * 0.25;   // 振幅 0.10~0.35，想飘更浪就调大
+        item.driftFreq = 0.2 + Math.random() * 0.4;   // 频率 0.2~0.6 rad/s，慢慢游才梦幻
+        item.driftPhase = Math.random() * Math.PI * 2;
+
         floatItems.push(item);
       }
     }
+  }
+
+  /* 分段随机半径：60% 小珠(0.08~0.18) + 30% 中珠(0.18~0.30) + 10% 大珠(0.30~0.42)，
+     大大小小错落开，才像随手撒向空中的一把泡泡，而不是同一模具的弹珠 */
+  function pickBallRadius() {
+    var r = Math.random();
+    if (r < 0.6) return 0.08 + Math.random() * 0.10;
+    if (r < 0.9) return 0.18 + Math.random() * 0.12;
+    return 0.30 + Math.random() * 0.12;
   }
 
   /* 照片拍立得：白边底板 + 照片贴面（前置 0.01 防止两个平面"打架闪屏"） */
@@ -450,43 +528,70 @@
       specular: 0x888888
     });
     var candle = new THREE.Mesh(candleGeo, candleMat);
+    /* 注意：圆柱的 position 是它的"正中心"而不是顶端！
+       高 1.0 的蜡烛放在 baseY+0.5，顶端才正好落在 baseY+1.0 */
     candle.position.set(0, baseY + 0.5, 0);
     scene.add(candle);
 
-    /* 烛芯：顶部一小截黑色细圆柱 */
+    /* 烛芯：顶部一小截黑色细圆柱（高 0.14，中心在 baseY+1.05 → 顶端 = baseY+1.12） */
     var wickGeo = new THREE.CylinderGeometry(0.018, 0.018, 0.14, 6);
     var wickMat = new THREE.MeshBasicMaterial({ color: 0x1a1a1a });
     var wick = new THREE.Mesh(wickGeo, wickMat);
     wick.position.set(0, baseY + 1.05, 0);
     scene.add(wick);
 
-    /* 火焰 = 三层套娃，全挂在一个"火焰小组"里，摇曳时一起动：
-       ① 内焰：亮黄白小水滴（圆锥），最亮最热
-       ② 外焰：橙红稍大半透明圆锥，像火苗外面那圈橙光
-       ③ 光晕：一片永远面向你的发光贴片（Sprite）+ 一盏小暖灯 */
-    flameBaseY = baseY + 1.14;
+    /* ============ 火焰：泪滴形三层结构 + 光晕 + 小暖灯 ============
+       关键设计（修复"火焰不居中、往屏幕里偏"）：
+       flameGroup 的原点精确钉在"烛芯顶端"(x=0, z=0 永不改写)，
+       摇曳只做"绕根部的微小倾斜"，根部像钉死在烛芯上，只有中上部摆动 ——
+       这样相机环绕到任何角度，火焰都精确立在烛芯正上方 */
+    flameBaseY = baseY + 1.12; // 精确 = 烛芯顶端的世界高度
     flameGroup = new THREE.Group();
     flameGroup.position.set(0, flameBaseY, 0);
 
-    var innerGeo = new THREE.ConeGeometry(0.07, 0.26, 12);
-    var innerMat = new THREE.MeshBasicMaterial({ color: 0xfff6b8 }); // 亮黄白
+    /* ① 根部淡蓝紫小球：真实蜡烛火焰最底部是一圈蓝色（那里燃烧最充分），
+       压扁贴在烛芯口，火苗立刻"专业"起来 */
+    var baseGeo = new THREE.SphereGeometry(0.05, 10, 8);
+    var baseMat = new THREE.MeshBasicMaterial({
+      color: 0x7f9dff,   // 淡蓝紫，想更蓝改 0x5f7fff
+      transparent: true,
+      opacity: 0.85,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    var blueBase = new THREE.Mesh(baseGeo, baseMat);
+    blueBase.scale.set(1, 0.7, 1);
+    blueBase.position.y = 0.02;
+    flameGroup.add(blueBase);
+
+    /* ② 内焰：亮白-淡黄小泪滴（球体沿 y 拉长 2 倍就是泪滴形），
+       底部贴在根部（position.y ≈ 半个高度） */
+    var innerGeo = new THREE.SphereGeometry(0.055, 12, 10);
+    var innerMat = new THREE.MeshBasicMaterial({ color: 0xfff7cc }); // 亮白偏暖
     var inner = new THREE.Mesh(innerGeo, innerMat);
-    inner.position.y = 0.13;
+    inner.scale.set(0.9, 2.0, 0.9); // 想火苗更细长就把中间的 2.0 调大
+    inner.position.y = 0.115;
     flameGroup.add(inner);
 
-    var outerGeo = new THREE.ConeGeometry(0.15, 0.44, 12);
+    /* ③ 中焰：橙黄-橙红稍大的半透明泪滴套在外面。
+       AdditiveBlending = 和后面的颜色"叠着发光"，亮处更亮，黑边自动消失 */
+    var outerGeo = new THREE.SphereGeometry(0.1, 12, 10);
     var outerMat = new THREE.MeshBasicMaterial({
-      color: 0xff7a2a,      // 橙红
+      color: 0xff8a3d,      // 橙黄偏红，想更红改 0xff6a2a
       transparent: true,
-      opacity: 0.5,         // 半透明，才像"光"而不是"塑料"
+      opacity: 0.7,         // 想更透亮降到 0.6，更浓升到 0.8
+      blending: THREE.AdditiveBlending,
       depthWrite: false
     });
     var outer = new THREE.Mesh(outerGeo, outerMat);
-    outer.position.y = 0.18;
+    outer.scale.set(1, 2.1, 1);
+    outer.position.y = 0.19; // 底部略低于内焰底部，刚好包住蓝色根部
     flameGroup.add(outer);
 
-    /* 光晕贴片：canvas 上画一个径向渐变圆（中间亮白 → 边缘透明），
-       Sprite 的特点是永远正对镜头，像贴在镜头上的柔光滤镜 */
+    /* ④ 光晕贴片：canvas 上画一个径向渐变（中心暖黄 → 向外透明）。
+       Sprite 永远正对镜头，且 center 默认 (0.5,0.5) = 贴片正中心对齐 position，
+       我们把 position 放在泪滴的视觉中心(y≈0.24)，光晕就正好抱住整团火苗，
+       不会出现"光斑飘在火焰上方"的错位感 */
     var glowMat = new THREE.SpriteMaterial({
       map: makeGlowTexture(),
       transparent: true,
@@ -495,20 +600,20 @@
       depthWrite: false
     });
     flameGlow = new THREE.Sprite(glowMat);
-    flameGlow.scale.set(1.6, 1.6, 1); // 想光晕更大就调大这两个数
-    flameGlow.position.y = 0.2;
+    flameGlow.scale.set(1.5, 1.8, 1); // 想光晕更大就调大这两个数
+    flameGlow.position.y = 0.24;
     flameGroup.add(flameGlow);
 
-    /* 火焰专属小暖灯：distance=8 表示光照到 8 格远就衰减没了，
-       只照亮蜡烛附近的球球，不会把整个场景打成白天 */
-    flameLight = new THREE.PointLight(0xffa050, 1.2, 8, 2);
-    flameLight.position.y = 0.25;
+    /* ⑤ 火焰专属小暖灯：放在火焰中心，暖橙色。
+       distance=9 表示光照到 9 格远就衰减没了，只照亮蜡烛附近的球球 */
+    flameLight = new THREE.PointLight(0xffa050, 1.3, 9, 2);
+    flameLight.position.y = 0.22;
     flameGroup.add(flameLight);
 
     scene.add(flameGroup);
   }
 
-  /* 画一张"径向渐变发光圆"贴图：中心亮白 → 橙黄 → 完全透明 */
+  /* 画一张"径向渐变发光圆"贴图：中心暖黄亮白 → 橙黄 → 完全透明 */
   function makeGlowTexture() {
     var canvas = document.createElement('canvas');
     canvas.width = 128;
@@ -530,7 +635,7 @@
       home    = 原来的位置（恢复时要飞回来）
       explode = 炸开后的落点（初始化时预计算 / 触发时按相机算）
       cur     = 现在插值到哪了（动画的核心数据）
-    每帧渲染时：位置 = cur + 正弦漂浮偏移，动画和呼吸互不干扰
+    每帧渲染时：位置 = cur + 漂移偏移 + 正弦呼吸偏移，动画和漂浮互不干扰
     ============================================================ */
   function makeFloatItem(group, isPhoto) {
     return {
@@ -546,6 +651,11 @@
       curRotX: 0, curRotZ: 0,
       rotFrom: { x: 0, z: 0 }, rotTo: { x: 0, z: 0 },
       rotExplode: { x: 0, z: 0 },
+      /* 漂移参数（小球专用，建球时随机化；照片 driftAmp 保持 0 = 不漂移，只呼吸） */
+      driftDir: new THREE.Vector3(0, 0, 0), // 漂移方向的单位向量
+      driftAmp: 0,                          // 漂移振幅：0=不漂
+      driftFreq: 0.4,                       // 漂移频率（rad/s）
+      driftPhase: 0,                        // 漂移相位
       /* 呼吸参数：相位错开，小球们才不会"集体做广播体操" */
       phase: Math.random() * Math.PI * 2,
       bobAmp: 0.08 + Math.random() * 0.05,  // 漂浮幅度（照片用；小球建好后会覆盖成更小值）
@@ -554,15 +664,19 @@
     };
   }
 
-  /* 小球炸开落点：以蛋糕中心为球心，随机方向 + 随机距离（13~24），
-     整个大球壳里撒满 —— 前后左右都有球飞过来，屏幕才被"球海"填满 */
+  /* 小球炸开落点：以蛋糕中心为球心撒满大球壳，分两条带 ——
+     约 45% 落在"近景带"(8~16)：正好萦绕在炸开后飞到相机前的照片簇四周，
+       照片被漫天泡泡簇拥着，中央区域不会空荡；
+     其余落在"远景带"(13~24)：把屏幕的前后左右都填满，才是"球海"而不是"球雾" */
   function precomputeBallExplodeTargets() {
     var center = new THREE.Vector3(0, CENTER_Y, 0);
     floatItems.forEach(function (item) {
       if (item.isPhoto) return; // 照片的落点要在炸开那一刻按相机位置算
       var theta = Math.random() * Math.PI * 2;
       var phi = Math.acos(2 * Math.random() - 1); // 球面均匀分布的老朋友
-      var dist = EXPLODE_R_MIN + Math.random() * (EXPLODE_R_MAX - EXPLODE_R_MIN);
+      var dist = Math.random() < 0.45
+        ? 8 + Math.random() * 8    // 近景带：萦绕照片簇的泡泡（想更密就把 0.45 调大）
+        : EXPLODE_R_MIN + Math.random() * (EXPLODE_R_MAX - EXPLODE_R_MIN);
       item.explode.set(
         center.x + dist * Math.sin(phi) * Math.cos(theta),
         center.y + dist * Math.cos(phi),
@@ -634,7 +748,7 @@
 
   /* ============================================================
     七、渲染循环：每帧跑一次（约 60 次/秒），负责 5 件小事
-      1. 转相机   2. 推进补间动画   3. 加呼吸漂浮
+      1. 转相机   2. 推进补间动画   3. 加漂移+呼吸漂浮
       4. 招牌面向相机 + 火焰摇曳   5. 画出一帧
     ============================================================ */
   function animate() {
@@ -665,10 +779,18 @@
       if (t >= 1) tweenActive = false; // 动画播完，省下之后的计算
     }
 
-    /* 3. 每个东西的实际位置 = 动画位置 + 呼吸漂浮偏移 */
+    /* 3. 每个东西的实际位置 = 动画位置 + 漂移偏移 + 呼吸漂浮偏移 */
     for (var j = 0; j < floatItems.length; j++) {
       var it = floatItems[j];
       it.group.position.copy(it.cur);
+      /* 梦幻漂移：沿自己的方向向量缓缓来回游动。
+         叠加在补间位置之上，所以蛋糕形态和炸开形态都生效 */
+      if (it.driftAmp > 0) {
+        var dOff = Math.sin(tSec * it.driftFreq + it.driftPhase) * it.driftAmp;
+        it.group.position.x += it.driftDir.x * dOff;
+        it.group.position.y += it.driftDir.y * dOff;
+        it.group.position.z += it.driftDir.z * dOff;
+      }
       it.group.position.y += Math.sin(tSec * it.bobSpeed + it.phase) * it.bobAmp;
       /* 缩放 = 原始缩放 × 动画缩放：小球的"半径"不会被动画吃掉 */
       it.group.scale.setScalar(it.baseScale * it.curScale);
@@ -692,25 +814,29 @@
       );
     }
 
-    /* 4b. 火焰摇曳：位置轻轻晃 + 缩放脉动 + 亮度随机游走，
-       三件事叠加起来，火苗就"活"了 */
+    /* 4b. 火焰摇曳：根部钉死在烛芯上（火焰组的 x/y/z 全程不动），
+       只做三件事 —— 绕根部的微小倾斜 + 从根部向上的缩放脉动 + 亮度随机游走，
+       叠起火苗就"活"了，而且任何角度看都不会偏离烛芯 */
     if (flameGroup) {
       /* 随机游走：每帧给"心情值"加一个小随机数，再夹回 0.7~1.0，
          像股票小幅波动，不会突然跳变 */
       flameFlicker += (Math.random() - 0.5) * 0.1;
       flameFlicker = clamp(flameFlicker, 0.7, 1.0);
 
-      flameGroup.position.x = Math.sin(tSec * 7.3) * 0.03 + (Math.random() - 0.5) * 0.02;
-      flameGroup.position.z = Math.cos(tSec * 6.1) * 0.03 + (Math.random() - 0.5) * 0.02;
-      flameGroup.position.y = flameBaseY + Math.sin(tSec * 11) * 0.015;
+      /* 绕根部倾斜（±0.06 弧度内）：旋转中心就是火焰组原点 = 烛芯顶端，
+         所以越靠近火苗尖摆得越明显，根部纹丝不动。
+         火苗高约 0.42，尖端最大摆幅 ≈ 0.42×0.051 ≈ 0.02，只有高度的 5% */
+      flameGroup.rotation.z = Math.sin(tSec * 7.3) * 0.045 + (Math.random() - 0.5) * 0.012;
+      flameGroup.rotation.x = Math.cos(tSec * 6.1) * 0.045 + (Math.random() - 0.5) * 0.012;
 
-      /* 心情值 0.7→缩放 0.9，1.0→缩放 1.15（火苗一伸一缩） */
+      /* 缩放脉动 0.9~1.15：以根部为锚点向上伸缩，
+         拉高时顺便变细一点（真火苗蹿高时会变瘦） */
       var s = 0.9 + ((flameFlicker - 0.7) / 0.3) * 0.25;
-      flameGroup.scale.set(s, s, s);
+      flameGroup.scale.set(1 - (s - 1) * 0.5, s, 1 - (s - 1) * 0.5);
 
       /* 灯光和光晕跟着心情值同步呼吸 */
-      flameLight.intensity = 1.4 * flameFlicker;
-      flameGlow.material.opacity = 0.7 + (flameFlicker - 0.7); // 0.7~1.0
+      flameLight.intensity = 0.7 + flameFlicker;            // 1.4~1.7 之间轻轻呼吸
+      flameGlow.material.opacity = 0.55 + flameFlicker * 0.35; // 0.8~0.9
     }
 
     /* 5. 把这一帧画到屏幕上 */
